@@ -1,0 +1,15 @@
+[Unit]
+Description=DaoDeGen Production Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/matt/daodegen
+ExecStart=/usr/bin/node /home/matt/daodegen/scripts/monitor.js
+EnvironmentFile=/home/matt/daodegen/production.env
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=daodegen-monitor
+
+# Restart on failure (for oneshot, use the timer for scheduling)

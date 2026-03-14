@@ -30,7 +30,8 @@
     "ipfs:setup": "npm install axios form-data && echo 'Set PINATA_API_KEY and PINATA_SECRET_API_KEY environment variables before running migration'",
     "ipfs:validate": "node scripts/validate-setup.js",
     "ipfs:test": "node -e \"console.log('Testing IPFS migration...'); require('./scripts/ipfs-migration.js')\"",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "monitor": "node scripts/monitor.js"
   },
   "devDependencies": {
     "axios": "^1.13.5",
