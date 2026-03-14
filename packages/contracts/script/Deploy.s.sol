@@ -100,7 +100,7 @@ contract Deploy is Script {
                 mintCooldown: 86400,
                 burnAmount: 1000e18, // 1000 DAODEGEN
                 poolManager: 0x00B036B58a818B1BC34d502D3fE730Db729e62AC, // V4 Unichain Sepolia PoolManager
-                hookFlags: 0x400000 // AFTER_SWAP_FLAG
+                hookFlags: 0x440000 // AFTER_SWAP_FLAG | AFTER_SWAP_RETURNS_DELTA_FLAG
             });
         } else if (chainId == 130) { // Unichain Mainnet
             return DeployConfig({
@@ -111,7 +111,7 @@ contract Deploy is Script {
                 mintCooldown: 86400,
                 burnAmount: 10000e18, // 10k DAODEGEN
                 poolManager: 0x1F98400000000000000000000000000000000004, // V4 Unichain Mainnet PoolManager
-                hookFlags: 0x400000 // AFTER_SWAP_FLAG
+                hookFlags: 0x440000 // AFTER_SWAP_FLAG | AFTER_SWAP_RETURNS_DELTA_FLAG
             });
         } else {
             revert("Unsupported chain");

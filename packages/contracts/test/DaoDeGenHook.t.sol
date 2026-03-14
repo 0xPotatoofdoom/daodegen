@@ -195,7 +195,7 @@ contract DaoDeGenHookTest is Test {
     // ETH fee routing path in afterSwap (feeCurrency = address(0))
     // -------------------------------------------------------------------------
 
-    function test_AfterSwap_ETHFeeRoutesToJar() public {
+    function test_AfterSwap_ETHFeeAccrues() public {
         PoolKey memory key = PoolKey({
             currency0: Currency.wrap(address(0)), // ETH
             currency1: Currency.wrap(makeAddr("token1")),
@@ -204,11 +204,9 @@ contract DaoDeGenHookTest is Test {
             hooks: IHooks(address(hook))
         });
 
-        // zeroForOne=false + amountSpecified>0 → specifiedTokenIs0 = (false == false) = true... wait:
         // specifiedTokenIs0 = (amountSpecified < 0) == zeroForOne
-        // To get feeCurrency = currency0 (ETH): specifiedTokenIs0 must be false
-        // specifiedTokenIs0 = false when: (amountSpecified < 0) != zeroForOne
-        // e.g. amountSpecified = -1e18 (< 0) and zeroForOne = false → (true != false) → false ✓
+        // amountSpecified = -1e18 (< 0) and zeroForOne = false → (true != false) → false
+        // feeCurrency = currency0 (ETH)
         SwapParams memory params = SwapParams({
             zeroForOne: false,
             amountSpecified: -1 ether,
@@ -219,22 +217,14 @@ contract DaoDeGenHookTest is Test {
         BalanceDelta delta = toBalanceDelta(2000 ether, -1 ether);
         uint256 expectedFee = 20 ether;
 
-        // Pre-fund hook with ETH (manager.take is mocked, won't actually send ETH)
-        vm.deal(address(hook), expectedFee);
-
-        vm.mockCall(
-            address(manager),
-            abi.encodeWithSelector(IPoolManager.take.selector),
-            abi.encode()
-        );
-
         vm.prank(address(manager));
         (bytes4 selector, int128 feeReturned) = hook.afterSwap(address(0), key, params, delta, "");
 
         assertEq(selector, IHooks.afterSwap.selector);
         assertEq(uint128(feeReturned), expectedFee);
-        // Jar received the ETH
-        assertEq(address(jar).balance, expectedFee);
+        // Fees accrued in hook, NOT immediately sent to jar
+        assertEq(hook.accruedFees(Currency.wrap(address(0))), expectedFee);
+        assertEq(address(jar).balance, 0);
     }
 
     function test_AfterSwap_RevertsForNonManager() public {
