@@ -10,6 +10,12 @@
 
 ---
 
+> **Status as of 2026-03-14:** Testnet (Unichain Sepolia) fully validated — contracts deployed, V4 pool seeded with DaoDeGenHook v3, fee collection e2e verified, direct swap UI built. Mainnet deployment is the next milestone. Items marked ✅ below are done on testnet; mainnet equivalents remain open.
+
+---
+
+---
+
 ## 1. Pre-Launch Checklist
 
 ### 1a. Smart Contracts

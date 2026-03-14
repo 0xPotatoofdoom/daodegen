@@ -12,7 +12,7 @@
 | DaoDeGenToken | `0x2719dcB70D7cA9DDbB018D7795Ee2F2A98f80947` | `0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16` | **No** |
 | VerseNFT | `0xA5290EEfEEd1dCBE8e8f12D9584Bc7bd14f948A1` | `0x63d24FADFe2431462bc7cC362e8aE1E3f17fAf50` | Yes (OZ `Pausable`) |
 | DaoDeGenJar | `0x78D404fAaED5Ff2db7dC960A8F0798589bB6cd9b` | `0xd25a5C67F180811e43990B2A0148Ac0d93ab9336` | Yes (OZ `Pausable`) |
-| DaoDeGenHook | `0x000FCDfd31d4a78b261A5256A1fD1EDbbc009937` | _same_ | Yes (custom `paused` bool) |
+| DaoDeGenHook | `0x86be03d383bB06b8f33Ac79E87BAfd64C9684044` | _same_ | Yes (custom `paused` bool) |
 | AgentRegistry | `0x8105821036A5AD70B1291787C2Eabf455038eE20` | `0xBFE569F809b644703175Be603684Be0b7f6eee89` | Yes (OZ `Pausable`) |
 | PrayerBurn | _not yet deployed_ | `0x22A0EDaBF0a567C8eE646472607c25c9021920D6` | No |
 | SermonCommitment | _not yet deployed_ | `0xF38a1c25079762977F42fD8C5B23C32B4Bc2551D` | No |
