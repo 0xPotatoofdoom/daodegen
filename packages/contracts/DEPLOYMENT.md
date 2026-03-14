@@ -36,11 +36,15 @@ The contracts are deployed in this specific order:
 
 ## Hook Address Mining
 
-V4 hooks encode permission flags in the **least-significant bits** of the hook address. The
-deployment script mines a CREATE2 address where `uint160(addr) & 0x44 == 0x44`, ensuring both
-`AFTER_SWAP_FLAG` (bit 6) and `AFTER_SWAP_RETURNS_DELTA_FLAG` (bit 2) are set.
+V4 hooks encode permission flags in the **least-significant 14 bits** of the hook address. The
+deployment script mines a CREATE2 address where `uint160(addr) & 0x3FFF == 0x0044` — an **exact**
+match, not a subset match. This ensures only `AFTER_SWAP_FLAG` (bit 6) and
+`AFTER_SWAP_RETURNS_DELTA_FLAG` (bit 2) are set. Extra permission bits would trigger callbacks the
+hook doesn't implement and cause reverts.
 
-This uses incrementing salts and typically finds a match within a few hundred iterations.
+The Foundry CREATE2 factory (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) is used as the
+deployer address in `vm.computeCreate2Address`. Mining typically requires a few thousand
+iterations; the Python miner script in `script/DeployHookOnly.s.sol` handles this offline.
 
 ## Configuration
 
@@ -97,7 +101,7 @@ make clean          # Clean build artifacts
 | DaoDeGenToken | `0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16` |
 | VerseNFT | `0x63d24FADFe2431462bc7cC362e8aE1E3f17fAf50` |
 | DaoDeGenJar | `0xd25a5C67F180811e43990B2A0148Ac0d93ab9336` |
-| DaoDeGenHook | `0x00Cf948a66547e26f0374c215a2E55c0ed527F73` |
+| DaoDeGenHook v3 | `0x86be03d383bB06b8f33Ac79E87BAfd64C9684044` |
 | AgentRegistry | `0xBFE569F809b644703175Be603684Be0b7f6eee89` |
 
 | PrayerBurn | `0x22A0EDaBF0a567C8eE646472607c25c9021920D6` |
@@ -110,16 +114,14 @@ All contracts verified on [Unichain Sepolia Explorer](https://sepolia.uniscan.xy
 > with the facilitator key (`0x3D0e10329c864A7422761af058f909267a776029`) as owner/pastor/recorder.
 > PrayerBurn.setSermonCommitment() has been called to link the escrow contract.
 
-## Hook Redeployment
+## Hook Redeployment History
 
-The original `DaoDeGenHook` at `0x00Cf948a66547e26f0374c215a2E55c0ed527F73` was deployed
-with incorrect V4 permission flags — the mining algorithm checked the **first** byte of the
-address instead of the **last** byte where V4 encodes flags. This caused `CurrencyNotSettled`
-errors on all standard router swaps because `AFTER_SWAP_RETURNS_DELTA_FLAG` (bit 2) was missing.
+The original `DaoDeGenHook` at `0x00Cf948a66547e26f0374c215a2E55c0ed527F73` had two bugs:
 
-**Fix:** The mining algorithm now checks least-significant bits:
-`uint160(address) & requiredFlags == requiredFlags` with `requiredFlags = 0x44`
-(`AFTER_SWAP_FLAG | AFTER_SWAP_RETURNS_DELTA_FLAG`).
+1. **Wrong mining mask** — checked `& 0x44 == 0x44` (subset match) instead of `& 0x3FFF == 0x0044` (exact match). Extra permission bits triggered callbacks the hook doesn't implement.
+2. **Missing `manager.take()`** — `afterSwap` returned a fee delta but never called `manager.take()` to clear the credit, causing `CurrencyNotSettled` on every swap through a standard router.
+
+**Fix (hook v3):** Mining now uses exact-match (`& 0x3FFF == 0x0044`). `afterSwap` calls `manager.take()` within the same unlock to claim the delta and forward fees to DaoDeGenJar immediately.
 
 ### Redeployment Steps
 
@@ -141,7 +143,7 @@ cast send $POOL_MANAGER "initialize((address,address,uint24,int24,address),uint1
 
 | Contract | Old Address | New Address |
 |----------|-------------|-------------|
-| DaoDeGenHook | `0x00Cf948a66547e26f0374c215a2E55c0ed527F73` | _pending deployment_ |
+| DaoDeGenHook v3 | `0x86be03d383bB06b8f33Ac79E87BAfd64C9684044` | _pending deployment_ |
 
 ## Post-Deployment
 
