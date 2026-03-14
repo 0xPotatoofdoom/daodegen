@@ -36,9 +36,11 @@ The contracts are deployed in this specific order:
 
 ## Hook Address Mining
 
-V4 hooks require specific address prefixes based on their permissions. The deployment script automatically mines an address that matches the `AFTER_SWAP_FLAG` permission.
+V4 hooks encode permission flags in the **least-significant bits** of the hook address. The
+deployment script mines a CREATE2 address where `uint160(addr) & 0x44 == 0x44`, ensuring both
+`AFTER_SWAP_FLAG` (bit 6) and `AFTER_SWAP_RETURNS_DELTA_FLAG` (bit 2) are set.
 
-This process can take some time and uses CREATE2 with incrementing salts until the correct prefix is found.
+This uses incrementing salts and typically finds a match within a few hundred iterations.
 
 ## Configuration
 
@@ -107,6 +109,39 @@ All contracts verified on [Unichain Sepolia Explorer](https://sepolia.uniscan.xy
 > **Note (2026-03-14):** PrayerBurn, SermonCommitment, and AnonymousPrayer were redeployed
 > with the facilitator key (`0x3D0e10329c864A7422761af058f909267a776029`) as owner/pastor/recorder.
 > PrayerBurn.setSermonCommitment() has been called to link the escrow contract.
+
+## Hook Redeployment
+
+The original `DaoDeGenHook` at `0x00Cf948a66547e26f0374c215a2E55c0ed527F73` was deployed
+with incorrect V4 permission flags — the mining algorithm checked the **first** byte of the
+address instead of the **last** byte where V4 encodes flags. This caused `CurrencyNotSettled`
+errors on all standard router swaps because `AFTER_SWAP_RETURNS_DELTA_FLAG` (bit 2) was missing.
+
+**Fix:** The mining algorithm now checks least-significant bits:
+`uint160(address) & requiredFlags == requiredFlags` with `requiredFlags = 0x44`
+(`AFTER_SWAP_FLAG | AFTER_SWAP_RETURNS_DELTA_FLAG`).
+
+### Redeployment Steps
+
+```bash
+# 1. Deploy new hook (mines correct address automatically)
+make deploy-hook-sepolia
+
+# 2. Initialize V4 pool with new hook address
+cast send $POOL_MANAGER "initialize((address,address,uint24,int24,address),uint160,bytes)" \
+  "($CURRENCY0,$CURRENCY1,$FEE,$TICK_SPACING,$NEW_HOOK)" $SQRT_PRICE_X96 "0x" \
+  --rpc-url $SEPOLIA_RPC --private-key $SEPOLIA_PRIVATE_KEY
+
+# 3. Seed liquidity in the new pool
+
+# 4. Drain liquidity from old pool (prevents router from hitting broken hook)
+
+# 5. Repeat on mainnet when validated
+```
+
+| Contract | Old Address | New Address |
+|----------|-------------|-------------|
+| DaoDeGenHook | `0x00Cf948a66547e26f0374c215a2E55c0ed527F73` | _pending deployment_ |
 
 ## Post-Deployment
 

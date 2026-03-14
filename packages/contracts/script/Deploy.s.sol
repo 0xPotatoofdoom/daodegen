@@ -24,7 +24,7 @@ contract Deploy is Script {
         uint256 mintCooldown;
         uint256 burnAmount;
         address poolManager;
-        uint256 hookFlags;  // Expected hook permissions as uint256
+        uint160 hookFlags;  // V4 hook permission flags (least-significant bits of address)
     }
 
     function run() external {
@@ -100,7 +100,7 @@ contract Deploy is Script {
                 mintCooldown: 86400,
                 burnAmount: 1000e18, // 1000 DAODEGEN
                 poolManager: 0x00B036B58a818B1BC34d502D3fE730Db729e62AC, // V4 Unichain Sepolia PoolManager
-                hookFlags: 0x440000 // AFTER_SWAP_FLAG | AFTER_SWAP_RETURNS_DELTA_FLAG
+                hookFlags: 0x44 // AFTER_SWAP_FLAG (1<<6) | AFTER_SWAP_RETURNS_DELTA_FLAG (1<<2)
             });
         } else if (chainId == 130) { // Unichain Mainnet
             return DeployConfig({
@@ -111,43 +111,39 @@ contract Deploy is Script {
                 mintCooldown: 86400,
                 burnAmount: 10000e18, // 10k DAODEGEN
                 poolManager: 0x1F98400000000000000000000000000000000004, // V4 Unichain Mainnet PoolManager
-                hookFlags: 0x440000 // AFTER_SWAP_FLAG | AFTER_SWAP_RETURNS_DELTA_FLAG
+                hookFlags: 0x44 // AFTER_SWAP_FLAG (1<<6) | AFTER_SWAP_RETURNS_DELTA_FLAG (1<<2)
             });
         } else {
             revert("Unsupported chain");
         }
     }
     
-    /// @notice Mine a hook address with the required permissions prefix
-    /// @dev V4 hooks must have addresses that match their permission flags
+    /// @notice Mine a hook address with the required V4 permission flags
+    /// @dev V4 encodes permission flags in the least-significant bits of the hook address.
+    ///      We check that `uint160(address) & requiredFlags == requiredFlags`.
     function mineHookAddress(
         address poolManager,
         address jar,
-        uint256 expectedFlags
+        uint160 requiredFlags
     ) internal view returns (address) {
-        // Calculate the expected prefix from hook flags
-        bytes1 expectedPrefix = bytes1(uint8(expectedFlags >> 152));
-        
-        // Mine addresses until we find one with the correct prefix
+        bytes32 initCodeHash = keccak256(abi.encodePacked(
+            type(DaoDeGenHook).creationCode,
+            abi.encode(poolManager, jar)
+        ));
+
         uint256 nonce = 0;
         while (true) {
             bytes32 salt = keccak256(abi.encodePacked("DaoDeGenHook", nonce));
-            address predicted = computeCreate2Address(
-                salt,
-                keccak256(abi.encodePacked(
-                    type(DaoDeGenHook).creationCode,
-                    abi.encode(poolManager, jar)
-                ))
-            );
-            
-            if (bytes1(bytes20(predicted)) == expectedPrefix) {
-                console.log("Found hook address:", predicted, "with salt:", nonce);
+            address predicted = computeCreate2Address(salt, initCodeHash);
+
+            if (uint160(predicted) & requiredFlags == requiredFlags) {
+                console.log("Found hook address:", predicted, "with nonce:", nonce);
                 return predicted;
             }
-            
+
             nonce++;
-            if (nonce > 100000) {
-                revert("Could not mine hook address");
+            if (nonce > 1000000) {
+                revert("Could not mine hook address within 1M iterations");
             }
         }
     }

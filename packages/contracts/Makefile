@@ -15,7 +15,7 @@ ifneq ($(wildcard .env),)
     export
 endif
 
-.PHONY: help build test clean deploy-local deploy-sepolia deploy-mainnet verify-all
+.PHONY: help build test clean deploy-local deploy-sepolia deploy-mainnet deploy-hook-sepolia deploy-hook-mainnet verify-all
 
 help: ## Show this help message
 	@echo "DaoDeGen Contract Deployment"
@@ -152,11 +152,40 @@ verify-prayerburn: ## Verify PrayerBurn on Etherscan
 anvil: ## Start local anvil node
 	anvil --host 0.0.0.0
 
-mine-hook: ## Mine a hook address with correct permissions
-	@echo "Mining hook address..."
+mine-hook: ## Mine a hook address with correct V4 permission flags
+	@echo "Mining hook address (flags=0x44: AFTER_SWAP | AFTER_SWAP_RETURNS_DELTA)..."
 	forge script script/Deploy.s.sol:Deploy \
-		--sig "mineHookAddress(address,address,uint256)" \
-		$(POOL_MANAGER) $(JAR_ADDRESS) 0x400000
+		--sig "mineHookAddress(address,address,uint160)" \
+		$(POOL_MANAGER) $(JAR_ADDRESS) 0x44
+
+# Hook-only redeployment (uses existing Jar + PoolManager)
+deploy-hook-sepolia: ## Deploy only the hook to Unichain Sepolia
+	@echo "Deploying DaoDeGenHook to Unichain Sepolia..."
+	@if [ -z "$(SEPOLIA_PRIVATE_KEY)" ]; then \
+		echo "Error: SEPOLIA_PRIVATE_KEY not set in .env file"; \
+		exit 1; \
+	fi
+	forge script script/DeployHookOnly.s.sol:DeployHookOnly \
+		--rpc-url $(SEPOLIA_RPC) \
+		--private-key $(SEPOLIA_PRIVATE_KEY) \
+		--broadcast \
+		--verify \
+		--etherscan-api-key $(ETHERSCAN_API_KEY)
+
+deploy-hook-mainnet: ## Deploy only the hook to Unichain mainnet
+	@echo "Deploying DaoDeGenHook to Unichain Mainnet..."
+	@if [ -z "$(MAINNET_PRIVATE_KEY)" ]; then \
+		echo "Error: MAINNET_PRIVATE_KEY not set in .env file"; \
+		exit 1; \
+	fi
+	@echo "WARNING: This will deploy the hook to MAINNET. Are you sure? (y/N)"
+	@read -r confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "Aborted."; exit 1)
+	forge script script/DeployHookOnly.s.sol:DeployHookOnly \
+		--rpc-url $(MAINNET_RPC) \
+		--private-key $(MAINNET_PRIVATE_KEY) \
+		--broadcast \
+		--verify \
+		--etherscan-api-key $(ETHERSCAN_API_KEY)
 
 # Contract interactions
 mint-nft: ## Mint an NFT (local only)
