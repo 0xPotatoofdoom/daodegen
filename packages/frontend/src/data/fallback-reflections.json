@@ -1,0 +1,112 @@
+{
+  "_description": "Pre-generated reflections for when the AI pastor is unavailable. Each category has keyword patterns for classification and multiple reflections to avoid repetition. Written in the pastor's voice per soul.md.",
+  "categories": {
+    "loss": {
+      "keywords": ["lost", "loss", "liquidat", "rekt", "rug", "scam", "stolen", "gone", "wiped", "crash", "dump", "down bad"],
+      "reflections": [
+        {
+          "content": "What you held was never permanent. The pool does not mourn the liquidity that leaves -- it simply quotes a new price. Your loss is real. Sit with it. But do not confuse the position with the person who held it.",
+          "verse_references": [2, 9],
+          "sentiment_tag": "grieving"
+        },
+        {
+          "content": "The sharper the leverage, the faster the liquidation. You already knew this. The verse does not soften what happened. It asks what you will carry forward, and what you will leave on the chain.",
+          "verse_references": [9],
+          "sentiment_tag": "grieving"
+        },
+        {
+          "content": "Thirty spokes share the hub of a wheel. It is the center hole that makes it useful. What was taken from you created space. The question is not what filled that space before, but what fills it now.",
+          "verse_references": [11],
+          "sentiment_tag": "grieving"
+        }
+      ]
+    },
+    "greed": {
+      "keywords": ["moon", "pump", "rich", "lambo", "when", "more", "greedy", "fomo", "ape", "leverage", "100x", "1000x", "all in"],
+      "reflections": [
+        {
+          "content": "When your target is hit -- simply close the position. Do not move the goalpost. Do not whisper 'just one more 2x.' Walk away from the screen.",
+          "verse_references": [9],
+          "sentiment_tag": "restless"
+        },
+        {
+          "content": "The protocol that takes no rent becomes the foundation. You are not the protocol. You are the one deciding how much is enough. The verse already answered this. You are choosing not to hear it.",
+          "verse_references": [7, 9],
+          "sentiment_tag": "proud"
+        }
+      ]
+    },
+    "seeking": {
+      "keywords": ["help", "guide", "what should", "how do", "path", "direction", "confused", "uncertain", "lost", "don't know", "seeking", "search", "find"],
+      "reflections": [
+        {
+          "content": "Free from positions, you perceive the hidden architecture. Chasing yields, you see only the candle in front of you. The protocol that can be forked is not the eternal protocol. What you seek may already be running -- you are just looking at the wrong explorer.",
+          "verse_references": [1],
+          "sentiment_tag": "seeking"
+        },
+        {
+          "content": "Can you embrace simplicity and not let complexity control you? Can you soften your focus and become like a newbie? The questions are not rhetorical. They are the practice.",
+          "verse_references": [10],
+          "sentiment_tag": "seeking"
+        },
+        {
+          "content": "The supreme good is like liquidity: it nourishes all trades without competing. It gathers in the deepest pools, the unglamorous places. Stop looking for the answer in the candles. Look where the capital rests.",
+          "verse_references": [8],
+          "sentiment_tag": "seeking"
+        }
+      ]
+    },
+    "gratitude": {
+      "keywords": ["thank", "grateful", "blessed", "appreciate", "gift", "offering", "dedicate", "honor"],
+      "reflections": [
+        {
+          "content": "She yields without possessing. She farms without expecting. When her trade is done, she takes no screenshot. That is why her portfolio endures. Your offering is received.",
+          "verse_references": [2],
+          "sentiment_tag": "grateful"
+        },
+        {
+          "content": "The genesis block is immortal. It gives birth to all state. Use it effortlessly. It was already enough. So is this.",
+          "verse_references": [6],
+          "sentiment_tag": "grateful"
+        }
+      ]
+    },
+    "confusion": {
+      "keywords": ["why", "understand", "makes no sense", "confus", "wat", "wtf", "huh", "explain", "meaning"],
+      "reflections": [
+        {
+          "content": "Yet both the seeker and the farmer emerge from the same mempool. This mempool is called darkness -- unconfirmed transactions, swirling. The beginning of all understanding. You are in the mempool. That is not a problem. That is where understanding begins.",
+          "verse_references": [1],
+          "sentiment_tag": "confused"
+        },
+        {
+          "content": "Profit comes from what is there. Usefulness from what is not there. The thing you cannot see is not missing. It is the part that makes the rest work.",
+          "verse_references": [11],
+          "sentiment_tag": "confused"
+        }
+      ]
+    },
+    "letting_go": {
+      "keywords": ["let go", "release", "move on", "forget", "detach", "leave", "walk away", "quit", "done", "over", "end"],
+      "reflections": [
+        {
+          "content": "Positions come and she does not cling. Positions liquidate and she lets them go. The verse does not ask you to be brave about this. It asks you to be honest. What are you still holding that is already gone?",
+          "verse_references": [2],
+          "sentiment_tag": "letting_go"
+        },
+        {
+          "content": "Walk away from the screen. The verse said it plainly. There is nothing to add.",
+          "verse_references": [9],
+          "sentiment_tag": "letting_go"
+        }
+      ]
+    }
+  },
+  "contemplation": {
+    "messages": [
+      "The pastor is in contemplation. Here is a verse to sit with.",
+      "The temple is quiet. A verse for your silence.",
+      "The pastor hears you. Words will come. For now, a verse."
+    ]
+  }
+}

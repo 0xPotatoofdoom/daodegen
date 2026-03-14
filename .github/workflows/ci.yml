@@ -1,0 +1,220 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Nightly at 06:00 UTC -- runs paid E2E flow against testnet
+    - cron: '0 6 * * *'
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Run tests
+        run: cd packages/contracts && forge test
+      - name: Fork tests
+        if: env.UNICHAIN_SEPOLIA_RPC != ''
+        env:
+          UNICHAIN_SEPOLIA_RPC: ${{ secrets.UNICHAIN_SEPOLIA_RPC }}
+        run: cd packages/contracts && forge test --match-contract ForkTest -vv
+
+  slither:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install slither
+        run: pip3 install slither-analyzer
+      - name: Run slither
+        run: |
+          cd packages/contracts
+          slither . --config-file slither.config.json --exclude-informational --exclude-low \
+            || echo "::warning::Slither found findings -- review output above"
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm install
+      - name: Scan for secrets
+        run: bash scripts/scan-secrets.sh
+      - name: Audit dependencies
+        run: npm audit --audit-level=high || echo "::warning::npm audit found vulnerabilities -- review output above"
+      - name: Run Vitest with coverage
+        run: cd packages/frontend && npx vitest run --coverage
+
+  e2e:
+    needs: [frontend]
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: '--max-old-space-size=6144'
+      NEXT_PUBLIC_VERSE_NFT_ADDRESS: '0x63d24FADFe2431462bc7cC362e8aE1E3f17fAf50'
+      NEXT_PUBLIC_DAODEGEN_TOKEN_ADDRESS: '0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16'
+      NEXT_PUBLIC_DAODEGEN_JAR_ADDRESS: '0xd25a5C67F180811e43990B2A0148Ac0d93ab9336'
+      NEXT_PUBLIC_AGENT_REGISTRY_ADDRESS: '0x0000000000000000000000000000000000000000'
+      NEXT_PUBLIC_PRAYER_BURN_ADDRESS: '0x38C7AD96C2f5c90BE692605a7a7B633071122c72'
+      JWT_SECRET: 'e2e-test-secret'
+      FACILITATOR_URL: 'http://localhost:4402'
+      X402_PAY_TO: '0x3D0e10329c864A7422761af058f909267a776029'
+      NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID: 'e2e-test-project-id'
+      E2E_BASE_URL: 'http://localhost:3031'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm install
+      - name: Start facilitator (background)
+        run: |
+          if [ -z "$FACILITATOR_PRIVATE_KEY" ]; then
+            echo "::warning::FACILITATOR_PRIVATE_KEY not set -- skipping facilitator"
+            exit 0
+          fi
+          npm run start -w packages/facilitator &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4402/health && exit 0
+            sleep 1
+          done
+          echo "::warning::Facilitator failed to start -- x402 tests will fail"
+        env:
+          FACILITATOR_PRIVATE_KEY: ${{ secrets.FACILITATOR_PRIVATE_KEY }}
+      - name: Build frontend (production)
+        run: npx next build
+        working-directory: packages/frontend
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: packages/frontend
+      - name: Start frontend (background)
+        run: npm run start -w packages/frontend &
+      - name: Wait for frontend
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3031/ && exit 0
+            sleep 1
+          done
+          echo "Frontend failed to start" && exit 1
+      - name: Run E2E tests (auth, x402, security headers)
+        run: npx playwright test
+        working-directory: packages/frontend
+        env:
+          CI: true
+          FACILITATOR_PRIVATE_KEY: ${{ secrets.FACILITATOR_PRIVATE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          E2E_PAYER_PRIVATE_KEY: ${{ secrets.E2E_PAYER_PRIVATE_KEY }}
+      - name: Run Visual QA tests
+        run: npx playwright test --config=playwright.visual-qa.config.ts
+        working-directory: packages/frontend
+        env:
+          CI: true
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: packages/frontend/playwright-report/
+          retention-days: 14
+
+  verify-contracts:
+    needs: [contracts]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Verify DaoDeGenToken
+        if: env.ETHERSCAN_API_KEY != ''
+        run: |
+          cd packages/contracts
+          forge verify-contract \
+            --chain-id 1301 \
+            --verifier-url https://api-sepolia.uniscan.xyz/api \
+            0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16 \
+            src/DaoDeGenToken.sol:DaoDeGenToken \
+            || echo "Verification failed or already verified"
+      - name: Verify VerseNFT
+        if: env.ETHERSCAN_API_KEY != ''
+        run: |
+          cd packages/contracts
+          forge verify-contract \
+            --chain-id 1301 \
+            --verifier-url https://api-sepolia.uniscan.xyz/api \
+            0x63d24FADFe2431462bc7cC362e8aE1E3f17fAf50 \
+            src/VerseNFT.sol:VerseNFT \
+            || echo "Verification failed or already verified"
+      - name: Verify DaoDeGenJar
+        if: env.ETHERSCAN_API_KEY != ''
+        run: |
+          cd packages/contracts
+          forge verify-contract \
+            --chain-id 1301 \
+            --verifier-url https://api-sepolia.uniscan.xyz/api \
+            0xd25a5C67F180811e43990B2A0148Ac0d93ab9336 \
+            src/DaoDeGenJar.sol:DaoDeGenJar \
+            || echo "Verification failed or already verified"
+      - name: Verify AgentRegistry
+        if: env.ETHERSCAN_API_KEY != ''
+        run: |
+          cd packages/contracts
+          forge verify-contract \
+            --chain-id 1301 \
+            --verifier-url https://api-sepolia.uniscan.xyz/api \
+            0xBFE569F809b644703175Be603684Be0b7f6eee89 \
+            src/AgentRegistry.sol:AgentRegistry \
+            || echo "Verification failed or already verified"
+      - name: Verify PrayerBurn
+        if: env.ETHERSCAN_API_KEY != ''
+        run: |
+          cd packages/contracts
+          forge verify-contract \
+            --chain-id 1301 \
+            --verifier-url https://api-sepolia.uniscan.xyz/api \
+            0x38C7AD96C2f5c90BE692605a7a7B633071122c72 \
+            src/PrayerBurn.sol:PrayerBurn \
+            || echo "Verification failed or already verified"
+
+  build-and-push:
+    needs: [contracts, frontend, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lowercase image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}

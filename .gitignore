@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+packages/contracts/out/
+packages/contracts/cache/
+packages/contracts/broadcast/
+packages/mcp-server/dist/
+.next/
+out/
+*.tsbuildinfo
+
+# Environment / secrets
+staging.env
+production.env
+.env
+.env.local
+.env.self
+*.key
+*.secrets
+*.wallet
+cdp_api_key.json
+
+# Test coverage & reports
+coverage/
+playwright-report/
+test-results/
+
+# OS
+.DS_Store
+packages/frontend/.env.production
+packages/frontend/.env.local
+packages/contracts/.env

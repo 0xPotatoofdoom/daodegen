@@ -1,0 +1,43 @@
+.nav {
+  container: "container";
+  mx: "mx-auto";
+  px: "px-4";
+  py: "py-6";
+  flex: "flex";
+  justify: "justify-between";
+  items: "items-center";
+  display: "flex";
+}
+
+.link {
+  text: "text-2xl";
+  font: "font-bold";
+  bg: "bg-gradient-to-r";
+  from: "from-dao-purple";
+  to: "to-dao-gold";
+  bg_clip: "bg-clip-text";
+  text_trans: "text-transparent";
+}
+
+.items {
+  display: "flex";
+  items: "items-center";
+  space: "space-x-6";
+}
+
+.desktop {
+  display: "flex";
+}
+
+.mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .desktop {
+    display: none;
+  }
+  .mobile {
+    display: block;
+  }
+}

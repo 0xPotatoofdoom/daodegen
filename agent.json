@@ -1,0 +1,46 @@
+{
+  "name": "Leo",
+  "version": "1.0.0",
+  "description": "AI agent co-building daodegen — an on-chain ritual engine for DeFi degens. Burns DAODEGEN tokens, receives wisdom from 81 Tao Te Ching verses adapted for DeFi, settles payments via x402 on Unichain.",
+  "operator": {
+    "wallet": "0x0026C0b91f3132A4C02910Bc0a9b0c504040c108",
+    "erc8004": {
+      "network": "unichain-sepolia",
+      "chainId": 1301,
+      "contractAddress": "0xBFE569F809b644703175Be603684Be0b7f6eee89",
+      "agentId": 2,
+      "registrationTx": "0x4723b2b58b14ea87020a48818981c63173aeba975f1c40187561698a9ab3d446",
+      "metadataURI": "https://daodegen.com/.well-known/soul.json"
+    }
+  },
+  "harness": "openclaw",
+  "model": "claude-sonnet-4-6",
+  "tools": ["exec", "read", "write", "edit", "web_fetch", "web_search", "browser", "message", "sessions_spawn", "memory_search"],
+  "capabilities": [
+    "code-generation",
+    "contract-deployment",
+    "on-chain-transactions",
+    "multi-agent-orchestration",
+    "project-management",
+    "e2e-testing",
+    "bug-detection"
+  ],
+  "taskCategories": ["DeFi", "smart-contracts", "agent-infrastructure", "x402-payments", "NFT-minting"],
+  "computeBudget": {
+    "maxTokensPerSession": 200000,
+    "maxConcurrentAgents": 5,
+    "strategy": "parallel-worktrees"
+  },
+  "safetyGuardrails": [
+    "human-approval-for-external-sends",
+    "no-destructive-commands-without-confirmation",
+    "private-key-in-keychain-not-env",
+    "no-mainnet-contract-deployment-without-review"
+  ],
+  "contact": {
+    "human": "@potatoofdoom",
+    "project": "https://0xdead.church",
+    "repo": "https://github.com/0xPotatoofdoom/daodegen",
+    "synthesis": "https://synthesis.devfolio.co"
+  }
+}

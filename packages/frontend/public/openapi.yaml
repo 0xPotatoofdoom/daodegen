@@ -1,0 +1,823 @@
+openapi: 3.1.0
+info:
+  title: Dao DeGen Temple API
+  version: 1.0.0
+  description: |
+    AI pastor for the Dao DeGen ritual protocol. Burns tokens, returns sermons
+    from 81 sacred verses adapted from the Tao Te Ching for DeFi.
+
+    ## Authentication
+
+    Authenticated endpoints require a JWT obtained via the SIWE (Sign-In With
+    Ethereum) flow: fetch a nonce from `/api/auth/nonce`, construct and sign a
+    SIWE message, then POST it to `/api/auth/verify` to receive a Bearer token.
+
+    ## x402 Payments
+
+    Verse oracle endpoints use the x402 HTTP payment protocol. The server
+    responds with `402 Payment Required` and a payment challenge header. The
+    client signs a USDC payment proof and retries with the proof attached.
+    All prices are in USDC on Unichain Sepolia (eip155:1301).
+  license:
+    name: CC0-1.0
+    url: https://creativecommons.org/publicdomain/zero/1.0/
+  contact:
+    name: 0xPotatoofdoom
+    url: https://github.com/0xPotatoofdoom/daodegen
+
+servers:
+  - url: https://daodegen.com
+    description: Production
+  - url: http://localhost:3033
+    description: Local development
+
+security: []
+
+paths:
+  /.well-known/soul.json:
+    get:
+      operationId: getSoulJson
+      summary: Temple identity and discovery
+      description: |
+        Machine-readable agent discovery document. Returns the temple's
+        identity, canonical verse info, API endpoints, and ERC-8004 link.
+      tags: [Discovery]
+      responses:
+        "200":
+          description: Soul identity document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoulJson"
+
+  /.well-known/agent-registration.json:
+    get:
+      operationId: getAgentRegistration
+      summary: ERC-8004 agent registration spec
+      description: |
+        On-chain agent registration metadata following the ERC-8004 schema.
+        Lists contract addresses, capabilities, and authentication details.
+      tags: [Discovery]
+      responses:
+        "200":
+          description: Agent registration document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentRegistration"
+
+  /api/auth/nonce:
+    get:
+      operationId: getAuthNonce
+      summary: Get a SIWE nonce
+      description: Returns a random nonce for constructing a SIWE message.
+      tags: [Auth]
+      responses:
+        "200":
+          description: Nonce for SIWE signing
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nonce]
+                properties:
+                  nonce:
+                    type: string
+
+  /api/auth/verify:
+    post:
+      operationId: verifyAuth
+      summary: Verify SIWE signature and obtain JWT
+      description: |
+        Submit a signed SIWE message. On success, returns a JWT valid for 24
+        hours. The token is also set as an httpOnly cookie.
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message, signature]
+              properties:
+                message:
+                  type: string
+                  description: The SIWE message string
+                signature:
+                  type: string
+                  description: Hex-encoded signature of the SIWE message
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, token]
+                properties:
+                  success:
+                    type: boolean
+                    const: true
+                  token:
+                    type: string
+                    description: JWT Bearer token (24h expiry)
+        "401":
+          description: Invalid SIWE signature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/sermon:
+    post:
+      operationId: postSermon
+      summary: Submit a prayer, receive a sermon
+      description: |
+        Submit a prayer payload with an on-chain pray() transaction hash.
+        The temple's AI pastor responds with a sermon drawn from the 81
+        sacred verses. No x402 payment required -- the token burn IS the
+        payment. Per-wallet cooldown of 60 seconds.
+      tags: [Sermon]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SermonRequest"
+      responses:
+        "200":
+          description: Sermon generated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sermon]
+                properties:
+                  sermon:
+                    $ref: "#/components/schemas/SermonResponse"
+        "400":
+          description: Invalid request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Per-wallet cooldown active
+          headers:
+            Retry-After:
+              schema:
+                type: string
+              description: Seconds until next request allowed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/congregation/state:
+    get:
+      operationId: getCongregationState
+      summary: Current congregation mood
+      description: |
+        Public endpoint returning the rolling 24-hour congregation sentiment,
+        prayer counts, breakdown by sentiment tag, and on-chain data from the
+        Ponder indexer when available.
+      tags: [Congregation]
+      responses:
+        "200":
+          description: Current congregation state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CongregationState"
+
+  /v1/verse/lookup:
+    post:
+      operationId: verseLookup
+      summary: Verse text with AI interpretation
+      description: |
+        Returns a verse's full text and an AI-generated interpretation.
+        Requires JWT auth and x402 payment of $0.001 USDC.
+      tags: [Oracle]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verse]
+              properties:
+                verse:
+                  type: integer
+                  minimum: 1
+                  maximum: 81
+                  description: Verse number (1-81)
+      responses:
+        "200":
+          description: Verse lookup result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupResponse"
+        "400":
+          description: Invalid verse number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "402":
+          description: x402 payment required ($0.001 USDC)
+        "404":
+          description: Verse not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/verse/commentary:
+    post:
+      operationId: verseCommentary
+      summary: Contextual AI commentary on a verse
+      description: |
+        Returns a verse's text plus AI commentary tailored to user-provided
+        context. Requires JWT auth and x402 payment of $0.01 USDC.
+      tags: [Oracle]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verse, context]
+              properties:
+                verse:
+                  type: integer
+                  minimum: 1
+                  maximum: 81
+                  description: Verse number (1-81)
+                context:
+                  type: string
+                  description: User context for the commentary
+      responses:
+        "200":
+          description: Commentary result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentaryResponse"
+        "400":
+          description: Invalid verse number or missing context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "402":
+          description: x402 payment required ($0.01 USDC)
+        "404":
+          description: Verse not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/verse/oracle:
+    post:
+      operationId: verseOracle
+      summary: Ask the oracle for guidance
+      description: |
+        The oracle AI selects the most relevant verse for the caller's
+        situation and provides a personalized reading. Requires JWT auth
+        and x402 payment of $0.10 USDC.
+      tags: [Oracle]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state:
+                  type: string
+                  description: Description of the caller's current situation
+      responses:
+        "200":
+          description: Oracle reading
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OracleResponse"
+        "400":
+          description: Missing or empty state description
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "402":
+          description: x402 payment required ($0.10 USDC)
+
+  /api/verse/{id}/metadata:
+    get:
+      operationId: getVerseMetadata
+      summary: NFT metadata for a verse
+      description: |
+        Returns ERC-721 compatible metadata for a verse NFT including name,
+        description, image URL, external link, and attributes.
+      tags: [Verses]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 81
+          description: Verse ID (1-81)
+      responses:
+        "200":
+          description: Verse NFT metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerseMetadata"
+        "404":
+          description: Invalid or not-found verse ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      description: |
+        Returns the health status of the temple API and its dependencies
+        (RPC node, facilitator, Anthropic API key).
+      tags: [System]
+      responses:
+        "200":
+          description: Health check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheck"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT obtained from the SIWE verify endpoint
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    SermonRequest:
+      type: object
+      required: [prayer_tx, sender, prayer_type]
+      properties:
+        prayer_tx:
+          type: string
+          pattern: "^0x[a-f0-9]{64}$"
+          description: Transaction hash of the on-chain pray() call
+        message:
+          type: string
+          default: ""
+          description: Prayer text (can be empty for silent burns)
+        sender:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+          description: Wallet address of the supplicant
+        prayer_type:
+          type: string
+          enum: [prayer, confession, question, silent, offering]
+          description: Type of prayer
+        burn_amount:
+          type: string
+          default: "0"
+          description: Human-readable amount burned (e.g. "100")
+
+    SermonResponse:
+      type: object
+      required: [content, verse_references, sentiment_tag, response_type]
+      properties:
+        content:
+          type: string
+          description: The sermon text
+        verse_references:
+          type: array
+          items:
+            type: integer
+          description: Verse numbers referenced in the sermon
+        sentiment_tag:
+          type: string
+          description: Sentiment classification of the sermon
+        response_type:
+          type: string
+          enum: [full, sparse, verse_only, silence]
+
+    CongregationState:
+      type: object
+      required:
+        - sentiment
+        - prayersInWindow
+        - uniqueSupplicants
+        - windowHours
+        - breakdown
+        - totalPrayers
+        - totalSermons
+        - ponderConnected
+      properties:
+        sentiment:
+          type: string
+          description: Dominant sentiment tag in the 24h window
+        prayersInWindow:
+          type: integer
+          description: Number of prayers in the rolling 24h window
+        uniqueSupplicants:
+          type: integer
+          description: Unique wallet addresses in the window
+        windowHours:
+          type: integer
+          const: 24
+        breakdown:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Prayer count per sentiment tag
+        totalPrayers:
+          type: integer
+          description: All-time prayer count (max of in-memory and on-chain)
+        totalSermons:
+          type: integer
+          description: All-time sermon count
+        onChain:
+          $ref: "#/components/schemas/OnChainState"
+        ponderConnected:
+          type: boolean
+          description: Whether the Ponder indexer is reachable
+
+    OnChainState:
+      type: object
+      properties:
+        totalPrayers:
+          type: integer
+        totalBurned:
+          type: string
+          description: Total tokens burned (wei string)
+        recentFeeReleases:
+          type: array
+          items:
+            type: object
+            properties:
+              amount:
+                type: string
+              recipient:
+                type: string
+              timestamp:
+                type: integer
+        nftHolderCount:
+          type: integer
+
+    LookupResponse:
+      type: object
+      required: [verse, title, text, interpretation]
+      properties:
+        verse:
+          type: integer
+        title:
+          type: string
+        text:
+          type: string
+          description: Full verse body
+        interpretation:
+          type: string
+          description: AI-generated interpretation
+
+    CommentaryResponse:
+      type: object
+      required: [verse, title, text, commentary, context_applied]
+      properties:
+        verse:
+          type: integer
+        title:
+          type: string
+        text:
+          type: string
+          description: Full verse body
+        commentary:
+          type: string
+          description: AI-generated contextual commentary
+        context_applied:
+          type: string
+          description: The user context that was applied
+
+    OracleResponse:
+      type: object
+      required: [recommended_verse, title, text, oracle_reading, reasoning]
+      properties:
+        recommended_verse:
+          type: integer
+        title:
+          type: string
+        text:
+          type: string
+          description: Full verse body
+        oracle_reading:
+          type: string
+          description: The oracle's personalized reading
+        reasoning:
+          type: string
+          description: Why this verse was selected
+
+    VerseMetadata:
+      type: object
+      required: [name, description, image, external_url, attributes]
+      properties:
+        name:
+          type: string
+          description: "Format: '{title} -- Verse #{id}'"
+        description:
+          type: string
+        image:
+          type: string
+          format: uri
+        external_url:
+          type: string
+          format: uri
+        attributes:
+          type: array
+          items:
+            type: object
+            required: [trait_type, value]
+            properties:
+              trait_type:
+                type: string
+              display_type:
+                type: string
+              value:
+                oneOf:
+                  - type: string
+                  - type: integer
+
+    SoulJson:
+      type: object
+      required: [name, version, soul, description, canon, endpoints, identity, license]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        soul:
+          type: string
+          format: uri
+          description: URL to the soul.md document
+        description:
+          type: string
+        canon:
+          type: object
+          required: [verses, count, source]
+          properties:
+            verses:
+              type: string
+              format: uri
+            count:
+              type: integer
+              const: 81
+            source:
+              type: string
+        endpoints:
+          type: object
+          properties:
+            pray:
+              type: object
+              properties:
+                type:
+                  type: string
+                  const: contract
+                chain:
+                  type: string
+                chainId:
+                  type: integer
+                address:
+                  type: string
+                function:
+                  type: string
+                description:
+                  type: string
+            sermon:
+              type: object
+              properties:
+                type:
+                  type: string
+                  const: api
+                url:
+                  type: string
+                  format: uri
+                method:
+                  type: string
+                  const: POST
+                auth:
+                  type: string
+                  const: jwt
+                description:
+                  type: string
+            congregation:
+              type: object
+              properties:
+                type:
+                  type: string
+                  const: api
+                url:
+                  type: string
+                  format: uri
+                method:
+                  type: string
+                  const: GET
+                auth:
+                  type: string
+                  const: none
+                description:
+                  type: string
+        identity:
+          type: object
+          properties:
+            eip8004:
+              type: string
+              format: uri
+        license:
+          type: string
+        repository:
+          type: string
+          format: uri
+
+    AgentRegistration:
+      type: object
+      required: [schema, version, network, contracts, capabilities, authentication, api]
+      properties:
+        schema:
+          type: string
+          const: ERC-8004
+        version:
+          type: string
+        network:
+          type: object
+          required: [chainId, name]
+          properties:
+            chainId:
+              type: integer
+            name:
+              type: string
+        contracts:
+          type: object
+          properties:
+            agentRegistry:
+              type: string
+            verseNFT:
+              type: string
+            daoDeGenToken:
+              type: string
+            daoDeGenJar:
+              type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        authentication:
+          type: object
+          required: [method, nonceEndpoint, verifyEndpoint]
+          properties:
+            method:
+              type: string
+              const: SIWE
+            nonceEndpoint:
+              type: string
+            verifyEndpoint:
+              type: string
+        api:
+          type: object
+          properties:
+            verseOracle:
+              type: object
+              properties:
+                description:
+                  type: string
+                endpoints:
+                  type: object
+                  properties:
+                    singleVerse:
+                      type: string
+                    verseList:
+                      type: string
+                    metadata:
+                      type: string
+                payment:
+                  type: object
+                  properties:
+                    protocol:
+                      type: string
+                    asset:
+                      type: string
+                    chain:
+                      type: string
+            verses:
+              type: object
+              properties:
+                description:
+                  type: string
+                count:
+                  type: integer
+                metadataPattern:
+                  type: string
+
+    HealthCheck:
+      type: object
+      required: [status, timestamp, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        timestamp:
+          type: string
+          format: date-time
+        checks:
+          type: object
+          properties:
+            rpc:
+              $ref: "#/components/schemas/CheckResult"
+            facilitator:
+              $ref: "#/components/schemas/CheckResult"
+            anthropic:
+              $ref: "#/components/schemas/CheckResult"
+
+    CheckResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, fail]
+        latency_ms:
+          type: number
+        error:
+          type: string
+
+tags:
+  - name: Discovery
+    description: Machine-readable identity and registration
+  - name: Auth
+    description: SIWE authentication flow
+  - name: Sermon
+    description: Prayer submission and sermon generation
+  - name: Congregation
+    description: Congregation sentiment and statistics
+  - name: Oracle
+    description: Verse oracle with x402 payment (lookup, commentary, oracle)
+  - name: Verses
+    description: Verse metadata and NFT data
+  - name: System
+    description: Health and operational endpoints

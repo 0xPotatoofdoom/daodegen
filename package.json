@@ -1,0 +1,58 @@
+{
+  "name": "@daodegen/monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dao DeGen - Oregon Trail × Charlie the Unicorn × Uniswap v4",
+  "workspaces": [
+    "packages/frontend",
+    "packages/facilitator",
+    "packages/ponder",
+    "packages/mcp-server"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev": "npm run dev --workspaces",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces",
+    "contracts:build": "cd packages/contracts && forge build",
+    "contracts:test": "cd packages/contracts && forge test",
+    "frontend:dev": "npm run dev -w packages/frontend",
+    "frontend:build": "npm run build -w packages/frontend",
+    "frontend:start": "npm run start -w packages/frontend",
+    "facilitator:dev": "npm run dev -w packages/facilitator",
+    "facilitator:start": "npm run start -w packages/facilitator",
+    "ponder:dev": "npm run dev -w packages/ponder",
+    "ponder:start": "npm run start -w packages/ponder",
+    "mcp:dev": "npm run dev -w packages/mcp-server",
+    "mcp:build": "npm run build -w packages/mcp-server",
+    "mcp:start": "npm run start -w packages/mcp-server",
+    "ipfs:migrate": "node scripts/ipfs-migration.js",
+    "ipfs:setup": "npm install axios form-data && echo 'Set PINATA_API_KEY and PINATA_SECRET_API_KEY environment variables before running migration'",
+    "ipfs:validate": "node scripts/validate-setup.js",
+    "ipfs:test": "node -e \"console.log('Testing IPFS migration...'); require('./scripts/ipfs-migration.js')\"",
+    "prepare": "git config core.hooksPath .githooks || true"
+  },
+  "devDependencies": {
+    "axios": "^1.13.5",
+    "form-data": "^4.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xPotatoofdoom/daodegen.git"
+  },
+  "keywords": [
+    "defi",
+    "nft",
+    "uniswap",
+    "web3",
+    "monorepo",
+    "nextjs",
+    "solidity"
+  ],
+  "author": "0xPotatoofdoom",
+  "license": "MIT"
+}

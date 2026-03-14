@@ -1,0 +1,26 @@
+name: daodegen-staging
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: daodegen/frontend:staging
+    restart: unless-stopped
+    env_file:
+      - staging.env
+    environment:
+      NODE_ENV: production
+      PORT: 3033
+    ports:
+      - "3033:3033"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3033/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"

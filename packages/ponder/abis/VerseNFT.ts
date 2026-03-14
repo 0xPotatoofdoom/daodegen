@@ -1,0 +1,58 @@
+export const VerseNFTAbi = [
+  {
+    type: "event",
+    name: "Transfer",
+    inputs: [
+      { name: "from", type: "address", indexed: true },
+      { name: "to", type: "address", indexed: true },
+      { name: "tokenId", type: "uint256", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "Approval",
+    inputs: [
+      { name: "owner", type: "address", indexed: true },
+      { name: "approved", type: "address", indexed: true },
+      { name: "tokenId", type: "uint256", indexed: true },
+    ],
+  },
+  {
+    type: "function",
+    name: "ownerOf",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "totalSupply",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "tokenByIndex",
+    inputs: [{ name: "index", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "tokenOfOwnerByIndex",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "index", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;

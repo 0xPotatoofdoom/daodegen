@@ -1,0 +1,19 @@
+{
+  "chainId": 130,
+  "network": "unichain-mainnet",
+  "deployedAt": "2026-03-13",
+  "deployedBy": "0x0026C0b91f3132A4C02910Bc0a9b0c504040c108",
+  "contracts": {
+    "DaoDeGenToken": "0x2719dcB70D7cA9DDbB018D7795Ee2F2A98f80947",
+    "VerseNFT": "0xA5290EEfEEd1dCBE8e8f12D9584Bc7bd14f948A1",
+    "DaoDeGenJar": "0x78D404fAaED5Ff2db7dC960A8F0798589bB6cd9b",
+    "DaoDeGenHook": "0x000FCDfd31d4a78b261A5256A1fD1EDbbc009937",
+    "AgentRegistry": "0x8105821036A5AD70B1291787C2Eabf455038eE20"
+  },
+  "notes": {
+    "hookSalt": 110,
+    "hookFlags": "0x400000 (AFTER_SWAP_FLAG)",
+    "poolManager": "0x1F98400000000000000000000000000000000004",
+    "initialHolder": "0x46bDB39539E34E68353d3A054e940DD7B3893D2D"
+  }
+}

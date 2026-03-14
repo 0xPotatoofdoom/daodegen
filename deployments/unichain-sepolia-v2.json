@@ -1,0 +1,22 @@
+{
+  "chainId": 1301,
+  "network": "unichain-sepolia",
+  "deployedAt": "2026-03-14",
+  "deployedBy": "0x3D0e10329c864A7422761af058f909267a776029",
+  "note": "Redeployed PrayerBurn + new SermonCommitment + AnonymousPrayer with facilitator key as owner/pastor/recorder",
+  "contracts": {
+    "PrayerBurn": "0x22A0EDaBF0a567C8eE646472607c25c9021920D6",
+    "SermonCommitment": "0xF38a1c25079762977F42fD8C5B23C32B4Bc2551D",
+    "AnonymousPrayer": "0x31C01646f56fEF263ebcbaceb605f6cF5FFec991"
+  },
+  "links": {
+    "PrayerBurn_sermonCommitment": "0xF38a1c25079762977F42fD8C5B23C32B4Bc2551D",
+    "SermonCommitment_pastor": "0x3D0e10329c864A7422761af058f909267a776029",
+    "AnonymousPrayer_authorizedRecorder": "0x3D0e10329c864A7422761af058f909267a776029"
+  },
+  "previousContracts": {
+    "PrayerBurn_old": "0x38C7AD96C2f5c90BE692605a7a7B633071122c72",
+    "SermonCommitment_old": "0x2afb7e968d034bbbe0c53e27c4359192d72544ae",
+    "AnonymousPrayer_old": "0x51b6d15579d9e896173ad8d3a7301e6a9247b6fe"
+  }
+}

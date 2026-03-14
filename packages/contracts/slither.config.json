@@ -1,0 +1,11 @@
+{
+  "filter_paths": "lib,test,script,node_modules",
+  "solc_remaps": [
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "v4-core/=lib/v4-core/src/",
+    "solmate/=lib/solmate/"
+  ],
+  "detectors_to_exclude": [],
+  "exclude_informational": false,
+  "exclude_low": false
+}

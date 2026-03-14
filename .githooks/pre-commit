@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Pre-commit hook: scan staged files for secrets before they reach the repo.
+exec bash "$(git rev-parse --show-toplevel)/scripts/scan-secrets.sh"

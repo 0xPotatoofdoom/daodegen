@@ -1,0 +1,25 @@
+{
+  "name": "dao-degen-ipfs-uploader",
+  "version": "1.0.0",
+  "description": "Upload Dao DeGen illustrations to IPFS for immutable storage",
+  "main": "upload-to-pinata.js",
+  "scripts": {
+    "upload": "node upload-to-pinata.js",
+    "test": "node test-pinata.js",
+    "install-deps": "npm install"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "form-data": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "ipfs",
+    "nft",
+    "pinata", 
+    "dao-degen",
+    "immutable-storage"
+  ]
+}

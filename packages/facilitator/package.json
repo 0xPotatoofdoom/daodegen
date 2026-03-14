@@ -1,0 +1,24 @@
+{
+  "name": "@daodegen/facilitator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@x402/core": "^2.3.1",
+    "@x402/evm": "^2.3.1",
+    "viem": "^2.45.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
