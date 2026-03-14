@@ -18,11 +18,28 @@ vi.mock('viem', () => ({
     readContract: mockReadContract,
   })),
   http: vi.fn(),
+  defineChain: vi.fn((c: unknown) => c),
 }));
 
 vi.mock('viem/chains', () => ({
   unichain: { id: 130, name: 'Unichain' },
+  unichainSepolia: { id: 1301, name: 'Unichain Sepolia' },
 }));
+
+// Mock stores -- auth.ts imports createNonceStore
+vi.mock('./stores', () => {
+  const store = new Map<string, number>();
+  return {
+    createNonceStore: vi.fn(() => ({
+      get: (k: string) => store.get(k),
+      set: (k: string, v: number) => store.set(k, v),
+      delete: (k: string) => store.delete(k),
+      has: (k: string) => store.has(k),
+      size: () => store.size,
+      entries: () => store.entries(),
+    })),
+  };
+});
 
 // Mock contracts module
 vi.mock('./contracts', () => ({
@@ -286,7 +303,7 @@ describe('verifyAgentIdentity - agent registry', () => {
     (process.env as Record<string, string | undefined>).NODE_ENV = origNodeEnv;
   });
 
-  it('returns error when address is not a registered agent', async () => {
+  it('returns success with user role when address is not a registered agent', async () => {
     setupNonce();
     mockVerify.mockResolvedValue({ success: true });
     mockReadContract.mockResolvedValueOnce(false); // isAgent = false
@@ -296,11 +313,11 @@ describe('verifyAgentIdentity - agent registry', () => {
       signature: '0xvalid',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('not a registered Agent');
+    expect(result.success).toBe(true);
+    expect(result.agentId).toBe('user');
   });
 
-  it('handles contract read failure gracefully', async () => {
+  it('handles contract read failure gracefully — returns user role', async () => {
     setupNonce();
     mockVerify.mockResolvedValue({ success: true });
     mockReadContract.mockRejectedValue(new Error('Contract call failed'));
@@ -310,9 +327,9 @@ describe('verifyAgentIdentity - agent registry', () => {
       signature: '0xvalid',
     });
 
-    // When contract read fails, isAgent stays false
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('not a registered Agent');
+    // When contract read fails, isAgent stays false -> user role
+    expect(result.success).toBe(true);
+    expect(result.agentId).toBe('user');
   });
 
   it('returns success with agentId when address is a registered agent', async () => {

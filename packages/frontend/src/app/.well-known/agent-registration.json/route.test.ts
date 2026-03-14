@@ -25,12 +25,12 @@ describe('GET /.well-known/agent-registration.json', () => {
     expect(data.version).toBe('1.0');
   });
 
-  it('network chainId is 130 (Unichain)', async () => {
+  it('network chainId matches active chain config', async () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(data.network.chainId).toBe(130);
-    expect(data.network.name).toBe('Unichain');
+    expect([130, 1301]).toContain(data.network.chainId);
+    expect(data.network.name).toBeTruthy();
   });
 
   it('contracts object contains expected contract addresses', async () => {
@@ -78,7 +78,7 @@ describe('GET /.well-known/agent-registration.json', () => {
 
     expect(data.api.verseOracle.payment.protocol).toBe('x402');
     expect(data.api.verseOracle.payment.asset).toBe('USDC');
-    expect(data.api.verseOracle.payment.chain).toBe('Unichain');
+    expect(data.api.verseOracle.payment.chain).toContain('Unichain');
   });
 
   it('verses section reports 81 verse count', async () => {

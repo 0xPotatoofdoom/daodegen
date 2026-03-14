@@ -60,17 +60,27 @@ describe('logger', () => {
       expect(typeof reqLogger).toBe('function');
     });
 
-    it('returns a child logger with reqId and route', () => {
+    it('returns a child logger with traceId and route', () => {
       const childLogger = reqLogger('/api/test');
 
       expect(logger.child).toHaveBeenCalledWith({
-        reqId: 'test-uuid-1234',
+        traceId: 'test-uuid-1234',
         route: '/api/test',
       });
       expect(childLogger).toBeDefined();
     });
 
-    it('creates a unique reqId for each call', () => {
+    it('uses provided traceId instead of generating one', () => {
+      reqLogger('/api/test', 'custom-trace-id');
+
+      expect(logger.child).toHaveBeenCalledWith({
+        traceId: 'custom-trace-id',
+        route: '/api/test',
+      });
+      expect(mockRandomUUID).not.toHaveBeenCalled();
+    });
+
+    it('creates a unique traceId for each call when none provided', () => {
       mockRandomUUID
         .mockReturnValueOnce('uuid-aaa')
         .mockReturnValueOnce('uuid-bbb');
@@ -79,10 +89,10 @@ describe('logger', () => {
       reqLogger('/api/second');
 
       expect(logger.child).toHaveBeenCalledWith(
-        expect.objectContaining({ reqId: 'uuid-aaa' })
+        expect.objectContaining({ traceId: 'uuid-aaa' })
       );
       expect(logger.child).toHaveBeenCalledWith(
-        expect.objectContaining({ reqId: 'uuid-bbb' })
+        expect.objectContaining({ traceId: 'uuid-bbb' })
       );
     });
 

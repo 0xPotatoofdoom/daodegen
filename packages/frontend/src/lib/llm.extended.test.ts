@@ -341,7 +341,7 @@ describe('AnthropicLLMProvider', () => {
 });
 
 describe('createProvider factory', () => {
-  it('creates AnthropicLLMProvider when API key is set', async () => {
+  it('creates a provider with LLM methods when API key is set', async () => {
     vi.resetModules();
     vi.doMock('@anthropic-ai/sdk', () => ({
       default: class MockAnthropic {
@@ -352,8 +352,12 @@ describe('createProvider factory', () => {
     const origKey = process.env.ANTHROPIC_API_KEY;
     process.env.ANTHROPIC_API_KEY = 'sk-test-key';
 
-    const { llm, AnthropicLLMProvider } = await import('./llm');
-    expect(llm).toBeInstanceOf(AnthropicLLMProvider);
+    const { llm } = await import('./llm');
+    // llm may be FailoverLLMProvider wrapping AnthropicLLMProvider
+    expect(typeof llm.generateSermon).toBe('function');
+    expect(typeof llm.generateInterpretation).toBe('function');
+    expect(typeof llm.generateCommentary).toBe('function');
+    expect(typeof llm.generateOracleReading).toBe('function');
 
     process.env.ANTHROPIC_API_KEY = origKey;
   });

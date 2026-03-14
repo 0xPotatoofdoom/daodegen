@@ -1,15 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+const { mockMkdir, mockAppendFile } = vi.hoisted(() => ({
+  mockMkdir: vi.fn().mockResolvedValue(undefined),
+  mockAppendFile: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    promises: {
+      ...(actual as { promises: Record<string, unknown> }).promises,
+      mkdir: mockMkdir,
+      appendFile: mockAppendFile,
+    },
+  };
+});
+
 import { NextRequest } from 'next/server'
-
-vi.mock('fs', () => ({
-  promises: {
-    mkdir: vi.fn().mockResolvedValue(undefined),
-    appendFile: vi.fn().mockResolvedValue(undefined),
-  },
-}))
-
 import { POST } from './route'
-import { promises as fsMock } from 'fs'
 
 function makeReq(body: unknown, headers: Record<string, string> = {}): NextRequest {
   return new NextRequest('http://localhost/api/notify', {
@@ -21,8 +30,8 @@ function makeReq(body: unknown, headers: Record<string, string> = {}): NextReque
 
 describe('POST /api/notify', () => {
   beforeEach(() => {
-    vi.mocked(fsMock.mkdir).mockResolvedValue(undefined as never)
-    vi.mocked(fsMock.appendFile).mockResolvedValue(undefined as never)
+    mockMkdir.mockResolvedValue(undefined)
+    mockAppendFile.mockResolvedValue(undefined)
   })
 
   it('returns 200 for valid email via x-forwarded-for', async () => {
@@ -91,7 +100,7 @@ describe('POST /api/notify', () => {
   })
 
   it('returns 500 when file system write fails', async () => {
-    vi.mocked(fsMock.appendFile).mockRejectedValueOnce(new Error('disk full') as never)
+    mockAppendFile.mockRejectedValueOnce(new Error('disk full'))
     const res = await POST(makeReq({ email: 'err@test.com' }, { 'x-forwarded-for': '10.4.4.4' }))
     expect(res.status).toBe(500)
     const data = await res.json()
@@ -99,7 +108,7 @@ describe('POST /api/notify', () => {
   })
 
   it('returns 500 when mkdir fails', async () => {
-    vi.mocked(fsMock.mkdir).mockRejectedValueOnce(new Error('permission denied') as never)
+    mockMkdir.mockRejectedValueOnce(new Error('permission denied'))
     const res = await POST(makeReq({ email: 'mkdir@test.com' }, { 'x-forwarded-for': '10.4.4.5' }))
     expect(res.status).toBe(500)
   })

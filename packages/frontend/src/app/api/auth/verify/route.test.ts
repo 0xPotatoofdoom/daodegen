@@ -13,6 +13,18 @@ vi.mock('@/lib/logger', () => ({
   })),
 }));
 
+vi.mock('@/lib/errors', () => ({
+  apiError: (status: number, code: string, details?: Record<string, unknown>) => {
+    const { NextResponse } = require('next/server');
+    return NextResponse.json({ code, message: code, ...(details || {}) }, { status });
+  },
+  Errors: {
+    AUTH_INVALID_TOKEN: 'AUTH_INVALID_TOKEN',
+    INTERNAL_ERROR: 'INTERNAL_ERROR',
+  },
+  getTraceId: () => 'test-trace-id',
+}));
+
 vi.mock('@/lib/env', () => ({
   env: {
     JWT_SECRET: 'test-secret',
@@ -148,7 +160,7 @@ describe('POST /api/auth/verify', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data.error).toBe('Invalid signature');
+    expect(data.code).toBe('AUTH_INVALID_TOKEN');
   });
 
   it('returns 401 when address is not a registered agent', async () => {
@@ -166,7 +178,7 @@ describe('POST /api/auth/verify', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data.error).toBe('Address is not a registered Agent (EIP-8004)');
+    expect(data.code).toBe('AUTH_INVALID_TOKEN');
   });
 
   it('returns 500 when request body is invalid JSON', async () => {
@@ -180,7 +192,7 @@ describe('POST /api/auth/verify', () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data.error).toBe('Authentication failed');
+    expect(data.code).toBe('INTERNAL_ERROR');
   });
 
   it('creates JWT with correct claims', async () => {
@@ -224,7 +236,7 @@ describe('POST /api/auth/verify', () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
-    expect(data.error).toBe('Authentication failed');
+    expect(data.code).toBe('INTERNAL_ERROR');
   });
 
   it('cookie has maxAge of 1 day (86400 seconds)', async () => {

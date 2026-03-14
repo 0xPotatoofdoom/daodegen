@@ -20,6 +20,7 @@ vi.mock('../lib/contracts', () => ({
   },
   VERSE_NFT_ABI: ['function totalSupply() view returns (uint256)'],
   DAODEGEN_TOKEN_ABI: ['function totalSupply() view returns (uint256)'],
+  chainConfig: { chainId: 1301, chainName: 'Unichain Sepolia', rpcUrl: 'https://sepolia.unichain.org', isTestnet: true },
 }));
 
 import { useReadContract, useBalance } from 'wagmi';
