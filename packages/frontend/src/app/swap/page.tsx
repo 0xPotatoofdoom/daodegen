@@ -6,7 +6,7 @@ import { parseEther, formatUnits } from 'viem'
 import { useState, useEffect, useCallback } from 'react'
 import { Navigation } from '../../components/Navigation'
 import { CONTRACT_ADDRESSES, chainConfig } from '../../lib/contracts'
-import { getQuote, createSwap, NATIVE_ETH_ADDRESS, type QuoteResponse } from '../../lib/uniswap-api'
+import { CHAIN_CONFIG, fetchDirectQuote, buildSwapCalldata, type DirectQuote } from '../../lib/direct-swap'
 
 const CHAIN_ID = chainConfig.chainId
 const EXPLORER_URL = chainConfig.explorerUrl
@@ -24,7 +24,7 @@ export default function SwapPage() {
   const [showSlippage, setShowSlippage] = useState(false)
 
   // Quote state
-  const [quote, setQuote] = useState<QuoteResponse | null>(null)
+  const [quote, setQuote] = useState<DirectQuote | null>(null)
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [quoteError, setQuoteError] = useState<string | null>(null)
 
@@ -38,7 +38,7 @@ export default function SwapPage() {
   const parsedCustom = customSlippage ? parseFloat(customSlippage) : NaN
   const activeSlippage = !isNaN(parsedCustom) && parsedCustom > 0 ? parsedCustom : slippage
 
-  // Debounced quote fetching
+  // Debounced quote fetching — direct V4 path (routing API doesn't allowlist hook pools)
   useEffect(() => {
     const amount = parseFloat(ethAmount)
     if (!ethAmount || isNaN(amount) || amount <= 0 || !address || !isCorrectChain) {
@@ -54,17 +54,11 @@ export default function SwapPage() {
     const controller = new AbortController()
     const timeout = setTimeout(async () => {
       try {
-        const result = await getQuote({
-          type: 'EXACT_INPUT',
-          tokenInChainId: CHAIN_ID,
-          tokenOutChainId: CHAIN_ID,
-          tokenIn: NATIVE_ETH_ADDRESS,
-          tokenOut: CONTRACT_ADDRESSES.DAODEGEN_TOKEN,
-          amount: parseEther(ethAmount).toString(),
-          swapper: address,
-          slippageTolerance: activeSlippage,
-          hooksOptions: 'V4_HOOKS_INCLUSIVE',
-        })
+        const result = await fetchDirectQuote(
+          CHAIN_ID,
+          parseEther(ethAmount),
+          Math.round(activeSlippage * 100),
+        )
         if (!controller.signal.aborted) {
           setQuote(result)
           setQuoteError(null)
@@ -85,18 +79,18 @@ export default function SwapPage() {
     }
   }, [ethAmount, address, isCorrectChain, activeSlippage])
 
-  // Handle swap
+  // Handle swap — direct V4 via UniversalRouter
   const handleSwap = useCallback(async () => {
     if (!quote) return
     setSwapApiError(null)
 
     try {
-      const tx = await createSwap(quote)
-      sendTransaction({
-        to: tx.to,
-        data: tx.data,
-        value: BigInt(tx.value),
-      })
+      const cfg = CHAIN_CONFIG[CHAIN_ID]
+      if (!cfg) throw new Error(`No config for chain ${CHAIN_ID}`)
+
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 20 // 20 min
+      const tx = buildSwapCalldata(cfg, quote.amountIn, quote.amountOutMin, deadline)
+      sendTransaction({ to: tx.to, data: tx.data, value: tx.value })
     } catch (err) {
       setSwapApiError(err instanceof Error ? err.message : 'Swap failed')
     }
@@ -114,7 +108,7 @@ export default function SwapPage() {
   // Derived values
   const ethNum = parseFloat(ethAmount) || 0
   const insufficientBalance = balance && ethNum > parseFloat(balance.formatted)
-  const outputAmount = quote ? formatUnits(BigInt(quote.quote.output.amount), 18) : null
+  const outputAmount = quote ? formatUnits(quote.amountOut, 18) : null
   const canSwap = isConnected && isCorrectChain && quote && !quoteLoading && !insufficientBalance && ethNum > 0 && !swapPending && !swapConfirming
 
   const getButtonText = () => {
@@ -244,20 +238,16 @@ export default function SwapPage() {
                     : '---'} DDGEN
                 </span>
               </div>
-              {quote.quote.priceImpact !== undefined && (
-                <div className="flex justify-between text-gray-400">
-                  <span>Price Impact</span>
-                  <span className={quote.quote.priceImpact > 5 ? 'text-red-400' : 'text-white'}>
-                    {quote.quote.priceImpact.toFixed(2)}%
-                  </span>
-                </div>
-              )}
-              {quote.quote.gasFeeUSD && (
-                <div className="flex justify-between text-gray-400">
-                  <span>Gas Estimate</span>
-                  <span className="text-white">${parseFloat(quote.quote.gasFeeUSD).toFixed(2)}</span>
-                </div>
-              )}
+              <div className="flex justify-between text-gray-400">
+                <span>Price Impact</span>
+                <span className={quote.priceImpactPct > 5 ? 'text-red-400' : 'text-white'}>
+                  ~{quote.priceImpactPct.toFixed(2)}%
+                </span>
+              </div>
+              <div className="flex justify-between text-gray-400">
+                <span>Hook Fee</span>
+                <span className="text-white">1% (to VERSE holders)</span>
+              </div>
               <div className="flex justify-between text-gray-400">
                 <span>Slippage Tolerance</span>
                 <span className="text-white">{activeSlippage}%</span>
@@ -265,12 +255,12 @@ export default function SwapPage() {
               <div className="flex justify-between text-gray-400">
                 <span>Min. Received</span>
                 <span className="text-white">
-                  {(parseFloat(outputAmount) * (1 - activeSlippage / 100)).toLocaleString(undefined, { maximumFractionDigits: 2 })} DDGEN
+                  {parseFloat(formatUnits(quote.amountOutMin, 18)).toLocaleString(undefined, { maximumFractionDigits: 2 })} DDGEN
                 </span>
               </div>
               <div className="flex justify-between text-gray-400">
                 <span>Route</span>
-                <span className="text-white">{quote.routing}</span>
+                <span className="text-white">V4 Direct (DaoDeGenHook)</span>
               </div>
             </div>
           )}

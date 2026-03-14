@@ -222,9 +222,8 @@ contract DaoDeGenHookTest is Test {
 
         assertEq(selector, IHooks.afterSwap.selector);
         assertEq(uint128(feeReturned), expectedFee);
-        // Fees accrued in hook, NOT immediately sent to jar
-        assertEq(hook.accruedFees(Currency.wrap(address(0))), expectedFee);
-        assertEq(address(jar).balance, 0);
+        // Fees go directly to jar within the same unlock (no accruedFees staging)
+        assertEq(address(jar).balance, expectedFee);
     }
 
     function test_AfterSwap_RevertsForNonManager() public {

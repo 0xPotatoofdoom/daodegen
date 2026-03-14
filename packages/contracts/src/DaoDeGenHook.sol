@@ -12,10 +12,16 @@ import {SafeCast} from "v4-core/libraries/SafeCast.sol";
 import {IUnlockCallback} from "v4-core/interfaces/callback/IUnlockCallback.sol";
 
 /// @title DaoDeGenHook
-/// @notice V4 afterSwap hook — routes a portion of swap output to the DaoDeGenJar.
-///         Uses AFTER_SWAP_RETURNS_DELTA_FLAG (0x04) so the PoolManager applies the
-///         returned fee delta directly. Accumulated fees are claimed via `claimFees()`
-///         which withdraws from the PoolManager and forwards to the Jar.
+/// @notice V4 afterSwap hook — routes 1% of swap output to DaoDeGenJar immediately.
+///
+/// Key design:
+///   - AFTER_SWAP_RETURNS_DELTA_FLAG (bit 2) set on hook address.
+///   - afterSwap() returns feeAmount as hookDeltaUnspecified → PoolManager credits
+///     hook with +feeAmount of the output currency.
+///   - Within the same afterSwap call (same unlock context), manager.take() is called
+///     to claim that credit and clear the hook's delta to zero.
+///   - Tokens are forwarded to DaoDeGenJar immediately.
+///   - V4 transient storage is tx-scoped, so the take() MUST happen in the same unlock.
 contract DaoDeGenHook is IHooks, IUnlockCallback {
     using SafeCast for uint256;
     using SafeCast for int128;
@@ -25,21 +31,16 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
     address public immutable jar;
     address public immutable owner;
     bool public paused;
-    uint256 public constant FEE_BPS = 100; // 1% fee
+    uint256 public constant FEE_BPS = 100;   // 1%
     uint256 public constant TOTAL_BPS = 10000;
-
-    /// @notice Accumulated fees per currency, claimable via `claimFees()`
-    mapping(Currency => uint256) public accruedFees;
 
     error OnlyPoolManager();
     error InvalidAddress();
     error HookPaused();
     error NotOwner();
-    error NothingToClaim();
 
     event HookPauseChanged(bool paused);
     event FeesAccrued(Currency indexed currency, uint256 amount);
-    event FeesClaimed(Currency indexed currency, uint256 amount, address indexed jar);
 
     modifier whenNotPaused() {
         if (paused) revert HookPaused();
@@ -80,9 +81,10 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
         return IHooks.beforeAddLiquidity.selector;
     }
 
-    function afterAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, BalanceDelta, BalanceDelta, bytes calldata)
-        external pure override returns (bytes4, BalanceDelta)
-    {
+    function afterAddLiquidity(
+        address, PoolKey calldata, ModifyLiquidityParams calldata,
+        BalanceDelta, BalanceDelta, bytes calldata
+    ) external pure override returns (bytes4, BalanceDelta) {
         return (IHooks.afterAddLiquidity.selector, BalanceDelta.wrap(0));
     }
 
@@ -92,9 +94,10 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
         return IHooks.beforeRemoveLiquidity.selector;
     }
 
-    function afterRemoveLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, BalanceDelta, BalanceDelta, bytes calldata)
-        external pure override returns (bytes4, BalanceDelta)
-    {
+    function afterRemoveLiquidity(
+        address, PoolKey calldata, ModifyLiquidityParams calldata,
+        BalanceDelta, BalanceDelta, bytes calldata
+    ) external pure override returns (bytes4, BalanceDelta) {
         return (IHooks.afterRemoveLiquidity.selector, BalanceDelta.wrap(0));
     }
 
@@ -104,9 +107,15 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
         return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), 0);
     }
 
-    /// @notice After swap — calculates fee and returns it as a hook delta.
-    ///         The PoolManager credits the fee to the hook's account because
-    ///         AFTER_SWAP_RETURNS_DELTA_FLAG is set on this hook's address.
+    /// @notice After swap — take 1% fee from the output token and forward to jar.
+    ///
+    /// Flow:
+    ///   1. Pool calls afterSwap with swap delta.
+    ///   2. Hook calculates feeAmount = 1% of output.
+    ///   3. Hook returns feeAmount as hookDeltaUnspecified → PoolManager credits hook +feeAmount.
+    ///   4. Hook calls manager.take() to claim that credit immediately (clears hook delta to 0).
+    ///   5. Hook forwards tokens to jar.
+    ///   6. Swap caller receives output minus feeAmount (delta reduced by pool manager).
     function afterSwap(
         address,
         PoolKey calldata key,
@@ -125,59 +134,42 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
         if (swapAmount == 0) return (IHooks.afterSwap.selector, 0);
 
         uint256 feeAmount = uint256(uint128(swapAmount)) * FEE_BPS / TOTAL_BPS;
+        if (feeAmount == 0) return (IHooks.afterSwap.selector, 0);
 
-        if (feeAmount > 0) {
-            // Track accrued fees — claimed later via claimFees()
-            accruedFees[feeCurrency] += feeAmount;
-            emit FeesAccrued(feeCurrency, feeAmount);
+        // Claim the delta credit that PoolManager will assign this hook
+        // (must happen in this unlock — transient storage is tx-scoped)
+        manager.take(feeCurrency, address(this), feeAmount);
+
+        // Forward to jar immediately
+        if (feeCurrency.isAddressZero()) {
+            (bool ok,) = jar.call{value: feeAmount}("");
+            require(ok, "ETH to jar failed");
+        } else {
+            feeCurrency.transfer(jar, feeAmount);
         }
 
-        // Return the fee delta — PoolManager credits this to the hook's account
+        emit FeesAccrued(feeCurrency, feeAmount);
+
+        // Return fee delta — PoolManager credits hook's account; take() above clears it
         return (IHooks.afterSwap.selector, feeAmount.toInt128());
     }
 
-    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external pure override returns (bytes4) {
+    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
+        external pure override returns (bytes4)
+    {
         return IHooks.beforeDonate.selector;
     }
 
-    function afterDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external pure override returns (bytes4) {
+    function afterDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
+        external pure override returns (bytes4)
+    {
         return IHooks.afterDonate.selector;
     }
 
-    // ── Fee claiming ────────────────────────────────────────────
-
-    /// @notice Claim all accrued fees for a currency, withdrawing from the
-    ///         PoolManager and forwarding to the DaoDeGenJar.
-    /// @param currency The currency to claim fees for
-    function claimFees(Currency currency) external {
-        uint256 amount = accruedFees[currency];
-        if (amount == 0) revert NothingToClaim();
-
-        accruedFees[currency] = 0;
-
-        // Unlock the PoolManager to withdraw our credited balance
-        manager.unlock(abi.encode(currency, amount));
-
-        emit FeesClaimed(currency, amount, jar);
-    }
-
-    /// @notice Callback from PoolManager.unlock() — takes tokens and sends to jar.
-    function unlockCallback(bytes calldata data) external override returns (bytes memory) {
+    // ── IUnlockCallback stub ────────────────────────────────────
+    // Not used for fee routing (fees go direct in afterSwap); kept for interface compliance.
+    function unlockCallback(bytes calldata) external override returns (bytes memory) {
         if (msg.sender != address(manager)) revert OnlyPoolManager();
-
-        (Currency currency, uint256 amount) = abi.decode(data, (Currency, uint256));
-
-        // Take tokens from PoolManager (burns our credit)
-        manager.take(currency, address(this), amount);
-
-        // Forward to jar
-        if (currency.isAddressZero()) {
-            (bool success,) = jar.call{value: amount}("");
-            require(success, "ETH transfer failed");
-        } else {
-            currency.transfer(jar, amount);
-        }
-
         return "";
     }
 
