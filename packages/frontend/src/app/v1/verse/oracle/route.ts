@@ -69,6 +69,8 @@ const handler = async (req: NextRequest) => {
   return NextResponse.json(response);
 };
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://daodegen.com";
+
 export const POST = withX402<unknown>(
   handler,
   {
@@ -79,6 +81,7 @@ export const POST = withX402<unknown>(
       payTo: PAY_TO,
     },
     description: "Verse oracle reading",
+    resource: `${SITE_URL}/v1/verse/oracle/`,
   },
   x402Server,
 );
