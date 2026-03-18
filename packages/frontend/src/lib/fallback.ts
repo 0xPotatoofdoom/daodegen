@@ -8,8 +8,6 @@
  * Tier 2 (verse-only): Return a deterministic verse based on the prayer
  *   message hash. No commentary. The scripture speaks for itself.
  *
- * Tier 3 (contemplation): Random verse with "the pastor is in contemplation"
- *   framing. The temple never goes fully dark.
  */
 
 import { SermonResponse, SermonResponseType } from "./llm";
@@ -28,7 +26,6 @@ interface FallbackCategory {
 }
 
 const categories = reflectionsData.categories as Record<string, FallbackCategory>;
-const contemplationMessages = reflectionsData.contemplation.messages;
 
 /**
  * Classify a prayer message into a fallback category using keyword matching.
@@ -111,23 +108,6 @@ export function tier2VerseOnly(
     content: verse.body,
     verse_references: [verse.id],
     sentiment_tag: "seeking",
-    response_type: "verse_only" as SermonResponseType,
-  };
-}
-
-/**
- * Tier 3: Random verse with contemplation framing.
- * The temple never goes fully dark.
- */
-export function tier3Contemplation(verses: Verse[]): SermonResponse {
-  const verse = verses[Math.floor(Math.random() * verses.length)];
-  const msgIndex = Math.floor(Math.random() * contemplationMessages.length);
-  const framing = contemplationMessages[msgIndex];
-
-  return {
-    content: `${framing}\n\nVerse ${verse.id}: "${verse.title}"\n\n${verse.body}`,
-    verse_references: [verse.id],
-    sentiment_tag: "peaceful",
     response_type: "verse_only" as SermonResponseType,
   };
 }

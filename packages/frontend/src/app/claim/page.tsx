@@ -163,7 +163,7 @@ export default function ClaimPage() {
               {/* Fee Overview */}
               <div className="grid md:grid-cols-2 gap-8 mb-8">
                 <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold mb-4">Fees in Jar (Undistributed)</h3>
+                  <h3 className="text-lg font-semibold mb-4">Fees in Jar (Outstanding)</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-400">ETH:</span>

@@ -6,11 +6,7 @@ const envSchema = z.object({
   CDP_API_KEY_ID: z.string().min(1).optional(),
   CDP_API_KEY_SECRET: z.string().min(1).optional(),
   X402_PAY_TO: z.string().min(1).optional(),
-  FACILITATOR_URL: z.string().min(1).default(
-    process.env.NODE_ENV === 'production'
-      ? '' // must be set explicitly in production
-      : 'http://localhost:4402'
-  ),
+  FACILITATOR_URL: z.string().min(1).default('http://localhost:4402'),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   VENICE_API_KEY: z.string().min(1).optional(),
   SENTRY_AUTH_TOKEN: z.string().min(1).optional(),
@@ -43,6 +39,10 @@ function parseEnv(): Env {
     if (process.env.NODE_ENV === 'production') {
       if (result.data.JWT_SECRET === 'dev-secret-do-not-use-in-production') {
         console.error('[env] JWT_SECRET must not use the dev default in production');
+        process.exit(1);
+      }
+      if (result.data.FACILITATOR_URL === 'http://localhost:4402') {
+        console.error('[env] FACILITATOR_URL must be set explicitly in production');
         process.exit(1);
       }
     }

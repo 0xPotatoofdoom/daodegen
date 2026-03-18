@@ -59,21 +59,18 @@ describe('wagmi config', () => {
     expect(chains[0].name).toBe('Unichain');
   });
 
-  it('includes standard EVM chains', async () => {
+  it('includes Unichain Sepolia testnet', async () => {
     const { config } = await import('./wagmi');
     const chains = capturedConfig!.chains as Array<{ id: number; name: string }>;
     const chainIds = chains.map((c) => c.id);
 
-    expect(chainIds).toContain(1);      // mainnet
-    expect(chainIds).toContain(8453);   // base
-    expect(chainIds).toContain(42161);  // arbitrum
-    expect(chainIds).toContain(137);    // polygon
+    expect(chainIds).toContain(1301);   // Unichain Sepolia
   });
 
-  it('configures 5 chains total', async () => {
+  it('configures 2 chains total (Unichain mainnet + Sepolia)', async () => {
     const { config } = await import('./wagmi');
     const chains = capturedConfig!.chains as Array<{ id: number }>;
-    expect(chains).toHaveLength(6);
+    expect(chains).toHaveLength(2);
   });
 
   describe('unichain chain definition', () => {

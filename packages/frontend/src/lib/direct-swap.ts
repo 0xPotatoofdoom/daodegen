@@ -54,7 +54,6 @@ const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000' as `0x${string
 // Pool params — same across chains (deterministic from deployment)
 const POOL_FEE         = 0
 const TICK_SPACING     = 60
-const POOL_TICK_SPACING = 60
 
 // UniversalRouter commands
 const CMD_V4_SWAP       = 0x10
@@ -255,4 +254,4 @@ export function buildSwapCalldata(
   }
 }
 
-export { POOL_FEE, TICK_SPACING, POOL_TICK_SPACING, ADDRESS_ZERO }
+export { POOL_FEE, TICK_SPACING, ADDRESS_ZERO }
