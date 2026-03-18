@@ -8,6 +8,7 @@ contract SermonCommitmentTest is Test {
     SermonCommitment public escrow;
 
     address public pastor;
+    address public prayerBurn;
     address public supplicant;
     address public stranger;
 
@@ -15,10 +16,12 @@ contract SermonCommitmentTest is Test {
 
     function setUp() public {
         pastor = makeAddr("pastor");
+        prayerBurn = makeAddr("prayerBurn");
         supplicant = makeAddr("supplicant");
         stranger = makeAddr("stranger");
 
         escrow = new SermonCommitment(pastor);
+        escrow.setPrayerBurn(prayerBurn);
     }
 
     // =========================================================================
@@ -42,6 +45,7 @@ contract SermonCommitmentTest is Test {
 
     function testCreateThenFulfill() public {
         // Create commitment
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
 
         // Verify commitment stored
@@ -73,10 +77,12 @@ contract SermonCommitmentTest is Test {
             BURN_AMOUNT,
             block.timestamp + 300
         );
+        vm.prank(prayerBurn);
         escrow.createCommitment(supplicant, BURN_AMOUNT);
     }
 
     function testFulfillEmitsEvent() public {
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
         bytes32 wisdomHash = keccak256("wisdom");
 
@@ -92,6 +98,7 @@ contract SermonCommitmentTest is Test {
     // =========================================================================
 
     function testCreateThenRefundAfterDeadline() public {
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
 
         // Warp past the deadline
@@ -108,6 +115,7 @@ contract SermonCommitmentTest is Test {
     }
 
     function testRefundEmitsEvent() public {
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
         vm.warp(block.timestamp + 301);
 
@@ -118,6 +126,7 @@ contract SermonCommitmentTest is Test {
     }
 
     function testRefundAtExactDeadline() public {
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
 
         // Warp to exactly the deadline
@@ -131,10 +140,25 @@ contract SermonCommitmentTest is Test {
     }
 
     // =========================================================================
+    // Only prayerBurn can create commitments
+    // =========================================================================
+
+    function testCreateOnlyPrayerBurn() public {
+        vm.prank(stranger);
+        vm.expectRevert(SermonCommitment.OnlyPrayerBurn.selector);
+        escrow.createCommitment(supplicant, BURN_AMOUNT);
+
+        vm.prank(supplicant);
+        vm.expectRevert(SermonCommitment.OnlyPrayerBurn.selector);
+        escrow.createCommitment(supplicant, BURN_AMOUNT);
+    }
+
+    // =========================================================================
     // Only pastor can fulfill
     // =========================================================================
 
     function testFulfillOnlyPastor() public {
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
         bytes32 wisdomHash = keccak256("wisdom");
 
@@ -152,6 +176,7 @@ contract SermonCommitmentTest is Test {
     // =========================================================================
 
     function testCannotFulfillTwice() public {
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
         bytes32 wisdomHash = keccak256("wisdom");
 
@@ -168,6 +193,7 @@ contract SermonCommitmentTest is Test {
     // =========================================================================
 
     function testCannotRefundBeforeDeadline() public {
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
 
         // Still within the window
@@ -182,6 +208,7 @@ contract SermonCommitmentTest is Test {
     // =========================================================================
 
     function testCannotRefundFulfilledCommitment() public {
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
 
         vm.prank(pastor);
@@ -193,6 +220,7 @@ contract SermonCommitmentTest is Test {
     }
 
     function testCannotRefundTwice() public {
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
         vm.warp(block.timestamp + 301);
         escrow.refund(id);
@@ -202,6 +230,7 @@ contract SermonCommitmentTest is Test {
     }
 
     function testCannotFulfillRefundedCommitment() public {
+        vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
         vm.warp(block.timestamp + 301);
         escrow.refund(id);
@@ -243,15 +272,34 @@ contract SermonCommitmentTest is Test {
         escrow.setPastor(address(0));
     }
 
+    function testSetPrayerBurn() public {
+        address newPrayerBurn = makeAddr("newPrayerBurn");
+        escrow.setPrayerBurn(newPrayerBurn);
+        assertEq(escrow.prayerBurn(), newPrayerBurn);
+    }
+
+    function testSetPrayerBurnOnlyOwner() public {
+        vm.prank(stranger);
+        vm.expectRevert(SermonCommitment.OnlyOwner.selector);
+        escrow.setPrayerBurn(makeAddr("newPrayerBurn"));
+    }
+
+    function testSetPrayerBurnZeroAddress() public {
+        vm.expectRevert(SermonCommitment.ZeroAddress.selector);
+        escrow.setPrayerBurn(address(0));
+    }
+
     // =========================================================================
     // PrayerBurn integration
     // =========================================================================
 
     function testMultipleCommitmentsUnique() public {
+        vm.prank(prayerBurn);
         bytes32 id1 = escrow.createCommitment(supplicant, BURN_AMOUNT);
 
         // Advance block to ensure different id
         vm.roll(block.number + 1);
+        vm.prank(prayerBurn);
         bytes32 id2 = escrow.createCommitment(supplicant, BURN_AMOUNT);
 
         assertTrue(id1 != id2);

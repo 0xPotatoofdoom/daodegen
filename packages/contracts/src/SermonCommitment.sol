@@ -15,6 +15,7 @@ contract SermonCommitment {
     // --- State ---
     address public pastor;
     address public owner;
+    address public prayerBurn;
 
     // --- Types ---
     struct Commitment {
@@ -36,11 +37,17 @@ contract SermonCommitment {
     // --- Errors ---
     error OnlyPastor();
     error OnlyOwner();
+    error OnlyPrayerBurn();
     error CommitmentNotFound();
     error AlreadyFulfilled();
     error AlreadyRefunded();
     error DeadlineNotReached();
     error ZeroAddress();
+
+    modifier onlyPrayerBurn() {
+        if (msg.sender != prayerBurn) revert OnlyPrayerBurn();
+        _;
+    }
 
     constructor(address _pastor) {
         if (_pastor == address(0)) revert ZeroAddress();
@@ -52,7 +59,7 @@ contract SermonCommitment {
     /// @param supplicant The address that burned tokens.
     /// @param burnAmount The number of tokens burned.
     /// @return id The unique commitment identifier.
-    function createCommitment(address supplicant, uint256 burnAmount) external returns (bytes32 id) {
+    function createCommitment(address supplicant, uint256 burnAmount) external onlyPrayerBurn returns (bytes32 id) {
         id = keccak256(abi.encodePacked(supplicant, burnAmount, block.timestamp, block.number));
         uint256 deadline = block.timestamp + FULFILLMENT_WINDOW;
 
@@ -98,6 +105,13 @@ contract SermonCommitment {
         c.refunded = true;
 
         emit CommitmentRefunded(commitmentId, c.supplicant);
+    }
+
+    /// @notice Update the PrayerBurn address.
+    function setPrayerBurn(address _prayerBurn) external {
+        if (msg.sender != owner) revert OnlyOwner();
+        if (_prayerBurn == address(0)) revert ZeroAddress();
+        prayerBurn = _prayerBurn;
     }
 
     /// @notice Update the pastor address.
