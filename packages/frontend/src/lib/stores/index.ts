@@ -9,6 +9,14 @@ function useRedis(): boolean {
   return !!process.env.REDIS_URL;
 }
 
+// Warn once at startup when falling back to in-memory stores (#250)
+if (!useRedis()) {
+  console.warn(
+    '[stores] No REDIS_URL — using in-memory stores. ' +
+    'Rate limits, nonces, and congregation data will not persist across restarts.'
+  );
+}
+
 export function createNonceStore() {
   if (useRedis()) {
     const { RedisNonceStore } = require('./redis');

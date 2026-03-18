@@ -45,6 +45,9 @@ const walletLastSermon: { get(k: string): number | undefined; set(k: string, v: 
       };
     } catch { /* fall through to memory */ }
   }
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('[sermon] Sermon cooldown using in-memory Map — will not persist across restarts.');
+  }
   return new Map<string, number>();
 })();
 

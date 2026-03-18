@@ -64,6 +64,16 @@ function parseEnv(): Env {
 
 export const env = parseEnv();
 
+// --- Production guard: in-memory state stores (#250) ---
+if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL) {
+  console.warn(
+    '\n⚠️  [env] REDIS_URL is not set in production!\n' +
+    '   Rate limits, nonces, and nullifiers are using in-memory stores.\n' +
+    '   They will NOT survive restarts and will NOT work across replicas.\n' +
+    '   Set REDIS_URL to enable persistent, shared state.\n'
+  );
+}
+
 // Client-safe exports moved to env-client.ts to avoid triggering Zod parse
 // on the client side (JWT_SECRET etc. are server-only).
 export { isNonProduction, appEnv, isStaging } from './env-client';

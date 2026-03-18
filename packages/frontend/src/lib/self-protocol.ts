@@ -184,8 +184,17 @@ export function getSelfUniversalLink(userId: string): string {
 }
 
 // --- Nullifier tracking (in-memory for now) ---
+// WARNING (#250): This Set lives in process memory. Nullifiers will be lost on
+// restart and are not shared across replicas. Move to Redis/DB before scaling.
 
 const usedNullifiers = new Set<string>();
+
+if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL) {
+  console.warn(
+    '[self-protocol] Nullifier set is in-memory — proof replay protection ' +
+    'will not survive restarts. Set REDIS_URL for persistent nullifier tracking.'
+  );
+}
 
 export function isNullifierUsed(nullifier: string): boolean {
   return usedNullifiers.has(nullifier);
