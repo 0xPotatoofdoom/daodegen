@@ -1,11 +1,5 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { http } from 'wagmi';
-import {
-  arbitrum,
-  base,
-  mainnet,
-  polygon,
-} from 'wagmi/chains';
 
 
 // RPC URLs use public endpoints as fallbacks -- these are not secrets.
@@ -61,7 +55,7 @@ export const config = getDefaultConfig({
     }
     return id || 'demo-project-id';
   })(),
-  chains: [unichain, unichainSepolia, mainnet, base, arbitrum, polygon],
+  chains: [unichain, unichainSepolia],
   transports: {
     [unichain.id]: http(unichainRpc),
     [unichainSepolia.id]: http(unichainSepoliaRpc),
