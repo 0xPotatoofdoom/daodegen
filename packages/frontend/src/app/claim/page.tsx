@@ -1,7 +1,7 @@
 'use client'
 
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useAccount, useBalance, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { formatEther, Address, zeroAddress } from 'viem'
 import { useState, useEffect } from 'react'
 import { Navigation } from '../../components/Navigation'
@@ -53,12 +53,17 @@ export default function ClaimPage() {
     query: { enabled: !!address }
   })
 
-  // Read outstanding ETH in jar (total undistributed)
+  // Read outstanding ETH in jar (allocated to holders but unclaimed)
   const { data: outstandingETH, refetch: refetchOutstanding } = useReadContract({
     address: CONTRACT_ADDRESSES.DAODEGEN_JAR as Address,
     abi: DAODEGEN_JAR_ABI,
     functionName: 'outstanding',
     args: [zeroAddress],
+  })
+
+  // Read jar contract ETH balance (total held: undistributed + unclaimed)
+  const { data: jarBalance, refetch: refetchJarBalance } = useBalance({
+    address: CONTRACT_ADDRESSES.DAODEGEN_JAR as Address,
   })
 
   // Read user's owned token IDs
@@ -95,8 +100,9 @@ export default function ClaimPage() {
       refetchOutstanding()
       refetchClaimable()
       refetchAllowance()
+      refetchJarBalance()
     }
-  }, [releaseConfirmed, claimConfirmed, refetchOutstanding, refetchClaimable, refetchAllowance])
+  }, [releaseConfirmed, claimConfirmed, refetchOutstanding, refetchClaimable, refetchAllowance, refetchJarBalance])
 
   const needsApproval = allowance != null && burnAmount != null && (allowance as bigint) < (burnAmount as bigint)
   const canRelease = isConnected && !needsApproval && burnAmount != null && tokenBalance != null && (tokenBalance as bigint) >= (burnAmount as bigint)
@@ -163,17 +169,25 @@ export default function ClaimPage() {
               {/* Fee Overview */}
               <div className="grid md:grid-cols-2 gap-8 mb-8">
                 <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold mb-4">Fees in Jar (Undistributed)</h3>
+                  <h3 className="text-lg font-semibold mb-4">Jar Fee Breakdown</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-400">ETH:</span>
+                      <span className="text-gray-400">Undistributed:</span>
+                      <span className="text-dao-gold font-semibold">
+                        {jarBalance != null && outstandingETH != null
+                          ? `${formatEther(jarBalance.value - (outstandingETH as bigint))} ETH`
+                          : 'Loading...'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Allocated (Unclaimed):</span>
                       <span className="text-dao-gold font-semibold">
                         {outstandingETH != null ? `${formatEther(outstandingETH as bigint)} ETH` : 'Loading...'}
                       </span>
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 mt-3">
-                    These fees must be released before they can be claimed by individual holders.
+                    Undistributed fees must be released before holders can claim. Allocated fees are already assigned to NFT holders awaiting claim.
                   </p>
                 </div>
 
