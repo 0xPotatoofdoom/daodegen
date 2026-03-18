@@ -133,7 +133,8 @@ contract PrayerBurn is Ownable, ReentrancyGuard {
         // Attempt release
         address[] memory assets = new address[](1);
         assets[0] = address(0);
-        try jar.release(assets) {} catch {}
+        // slither-disable-next-line low-level-calls
+        try jar.release(assets) {} catch {} // best-effort: release failure is non-fatal
     }
 
     /// @notice Approve the Jar to spend this contract's DAODEGEN for release burns.

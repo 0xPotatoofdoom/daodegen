@@ -44,8 +44,9 @@ jobs:
       - name: Run slither
         run: |
           cd packages/contracts
-          slither . --config-file slither.config.json --exclude-informational --exclude-low \
-            || echo "::warning::Slither found findings -- review output above"
+          slither . --config-file slither.config.json \
+            --exclude-informational --exclude-low \
+            --fail-on medium
 
   frontend:
     runs-on: ubuntu-latest
