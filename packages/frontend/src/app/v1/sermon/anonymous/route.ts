@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
   const { nullifier } = verification;
 
   // --- Check nullifier replay ---
-  if (isNullifierUsed(nullifier)) {
+  if (await isNullifierUsed(nullifier)) {
     return apiError(409, Errors.ANON_NULLIFIER_USED, undefined, undefined, traceId);
   }
 
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Mark nullifier as used and record cooldown
-  markNullifierUsed(nullifier);
+  await markNullifierUsed(nullifier);
   nullifierLastSermon.set(nullifier, Date.now());
 
   // Record prayer with "anonymous" sender — sentiment is still tracked
