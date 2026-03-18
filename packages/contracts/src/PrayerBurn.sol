@@ -93,6 +93,7 @@ contract PrayerBurn is Ownable, ReentrancyGuard {
 
         // Create sermon commitment if escrow is configured.
         // Non-fatal: if SermonCommitment reverts for any reason, burn proceeds without escrow.
+        // When sermonCommitment is not configured, commitmentId remains bytes32(0).
         bytes32 commitmentId;
         if (address(sermonCommitment) != address(0)) {
             try sermonCommitment.createCommitment(msg.sender, amount) returns (bytes32 id) {
@@ -100,8 +101,8 @@ contract PrayerBurn is Ownable, ReentrancyGuard {
             } catch {
                 // SermonCommitment failure is non-fatal — burn proceeds, commitment skipped
             }
-            emit PrayerBurned(msg.sender, amount, commitmentId);
         }
+        emit PrayerBurned(msg.sender, amount, commitmentId);
 
         _tryRelease();
     }
