@@ -475,9 +475,9 @@ contract DaoDeGenJarTest is Test {
         jar.release(assets);
         vm.stopPrank();
         
-        // user1 (ID 1) should get 1 + 1 (remainder) = 2
-        // user2 (ID 2) should get 1
-        assertEq(jar.claimable(1, assets[0]), 2);
-        assertEq(jar.claimable(2, assets[0]), 1);
+        // user1 (ID 1) should get 1
+        // user2 (ID 2) should get 1 + 1 (remainder) = 2
+        assertEq(jar.claimable(1, assets[0]), 1);
+        assertEq(jar.claimable(2, assets[0]), 2);
     }
 }
