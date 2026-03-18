@@ -5,6 +5,7 @@ interface CheckResult {
   status: 'ok' | 'fail';
   latency_ms?: number;
   error?: string;
+  provider?: string;
 }
 
 async function checkRpc(): Promise<CheckResult> {
@@ -26,18 +27,31 @@ async function checkRpc(): Promise<CheckResult> {
   }
 }
 
+// Provider priority matches llm.ts: Venice → Bankr → Anthropic
+const LLM_PROVIDERS = [
+  { name: 'venice', envVar: 'VENICE_API_KEY' },
+  { name: 'bankr', envVar: 'BANKR_API_KEY' },
+  { name: 'anthropic', envVar: 'ANTHROPIC_API_KEY' },
+] as const;
 
-function checkAnthropic(): CheckResult {
-  return process.env.ANTHROPIC_API_KEY
-    ? { status: 'ok' }
-    : { status: 'fail', error: 'ANTHROPIC_API_KEY not set' };
+function checkLlmProvider(): CheckResult {
+  for (const { name, envVar } of LLM_PROVIDERS) {
+    if (process.env[envVar]) {
+      console.log(`[health] active LLM provider: ${name} (${envVar})`);
+      return { status: 'ok', provider: name };
+    }
+  }
+
+  const checked = LLM_PROVIDERS.map((p) => p.envVar).join(', ');
+  console.warn(`[health] no LLM provider key found (checked: ${checked})`);
+  return { status: 'fail', error: `No LLM provider key set (checked: ${checked})` };
 }
 
 export async function GET() {
   const rpc = await checkRpc();
-  const anthropic = checkAnthropic();
+  const llm = checkLlmProvider();
 
-  const checks = { rpc, anthropic };
+  const checks = { rpc, llm };
   const allOk = Object.values(checks).every((c) => c.status === 'ok');
 
   return NextResponse.json({
