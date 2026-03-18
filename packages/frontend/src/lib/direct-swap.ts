@@ -136,7 +136,9 @@ export async function fetchDirectQuote(
 ): Promise<DirectQuote> {
   const cfg = CHAIN_CONFIG[chainId]
   if (!cfg) throw new Error(`Unsupported chain ${chainId}`)
-  if (!cfg.daodegenToken) throw new Error('Mainnet addresses not yet configured')
+  if (cfg.daodegenToken === ADDRESS_ZERO || cfg.daodegenHook === ADDRESS_ZERO) {
+    throw new Error('Mainnet swap not yet available — contract addresses not configured')
+  }
 
   let sqrtPriceX96: bigint
   let liquidity: bigint
@@ -207,6 +209,10 @@ export function buildSwapCalldata(
   amountOutMin: bigint,
   deadlineSecs: number,
 ): { to: `0x${string}`; data: `0x${string}`; value: bigint } {
+  if (cfg.daodegenToken === ADDRESS_ZERO || cfg.daodegenHook === ADDRESS_ZERO) {
+    throw new Error('Mainnet swap not yet available — contract addresses not configured')
+  }
+
   const poolKey = buildPoolKey(cfg)
 
   const actions = encodePacked(
