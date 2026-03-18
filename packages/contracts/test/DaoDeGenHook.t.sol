@@ -15,7 +15,7 @@ import {ModifyLiquidityParams, SwapParams} from "v4-core/types/PoolOperation.sol
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
 
 /// @title DaoDeGenHookTest
-/// @notice RED TEST for Issue #75: Add test coverage for DaoDeGenHook
+/// @notice Tests for DaoDeGenHook including timelock pause behavior (Issue #257)
 contract DaoDeGenHookTest is Test {
     using CurrencyLibrary for Currency;
 
@@ -34,9 +34,8 @@ contract DaoDeGenHookTest is Test {
     }
 
     function test_Hook_AfterSwap_RoutesFees() public {
-        // Mock a pool key and swap params
         PoolKey memory key = PoolKey({
-            currency0: Currency.wrap(address(0)), // ETH
+            currency0: Currency.wrap(address(0)),
             currency1: Currency.wrap(makeAddr("token1")),
             fee: 3000,
             tickSpacing: 60,
@@ -45,32 +44,24 @@ contract DaoDeGenHookTest is Test {
 
         SwapParams memory params = SwapParams({
             zeroForOne: true,
-            amountSpecified: -1 ether, // Swap 1 ETH
+            amountSpecified: -1 ether,
             sqrtPriceLimitX96: 0
         });
 
-        BalanceDelta delta = toBalanceDelta(-1 ether, 2000 ether); // Swapped 1 ETH for 2000 units of currency1
-
-        // 1% fee of 2000 units = 20 units
+        BalanceDelta delta = toBalanceDelta(-1 ether, 2000 ether);
         uint256 expectedFee = 20 ether;
 
-        // Mock manager.take() - The hook calls this
         vm.mockCall(
             address(manager),
             abi.encodeWithSelector(IPoolManager.take.selector),
             abi.encode()
         );
 
-        // We expect the hook to call afterSwap and return the selector + fee amount
         vm.prank(address(manager));
         (bytes4 selector, int128 fee) = hook.afterSwap(address(0), key, params, delta, "");
 
         assertEq(selector, IHooks.afterSwap.selector);
         assertEq(uint128(fee), expectedFee);
-
-        // Check if fee was actually routed to the jar
-        // (Wait, the hook currently doesn't have a way to verify this without real balances)
-        // This is a RED test because we want to verify the INTEGRATION between Hook and Jar.
     }
 
     function test_AfterSwap_MinInt128() public {
@@ -88,10 +79,8 @@ contract DaoDeGenHookTest is Test {
             sqrtPriceLimitX96: 0
         });
 
-        // Create a delta where amount1 is type(int128).min -- the edge case
         BalanceDelta delta = toBalanceDelta(-1 ether, type(int128).min);
 
-        // Should return gracefully (0 fee) instead of reverting
         vm.prank(address(manager));
         (bytes4 selector, int128 fee) = hook.afterSwap(address(0), key, params, delta, "");
 
@@ -99,7 +88,18 @@ contract DaoDeGenHookTest is Test {
         assertEq(fee, 0);
     }
 
-    function test_HookPause() public {
+    // -------------------------------------------------------------------------
+    // Timelock pause tests (Issue #257)
+    // -------------------------------------------------------------------------
+
+    function test_EmergencyPause_Instant() public {
+        // Emergency pause should execute immediately — no timelock
+        hook.schedulePause(true);
+        assertTrue(hook.paused());
+        assertEq(hook.pauseScheduledAt(), 0);
+    }
+
+    function test_EmergencyPause_BlocksSwaps() public {
         PoolKey memory key = PoolKey({
             currency0: Currency.wrap(address(0)),
             currency1: Currency.wrap(makeAddr("token1")),
@@ -116,45 +116,155 @@ contract DaoDeGenHookTest is Test {
 
         BalanceDelta delta = toBalanceDelta(-1 ether, 2000 ether);
 
-        // Pause the hook
-        hook.setPaused(true);
+        hook.schedulePause(true);
 
-        // afterSwap should revert
         vm.prank(address(manager));
         vm.expectRevert(DaoDeGenHook.HookPaused.selector);
         hook.afterSwap(address(0), key, params, delta, "");
+    }
 
-        // Unpause
-        hook.setPaused(false);
+    function test_Unpause_RequiresTimelock() public {
+        // Pause first
+        hook.schedulePause(true);
+        assertTrue(hook.paused());
 
-        // Mock manager.take()
+        // Schedule unpause
+        hook.schedulePause(false);
+        assertTrue(hook.paused()); // still paused
+        assertGt(hook.pauseScheduledAt(), 0);
+
+        // Cannot execute before timelock expires
+        vm.expectRevert(DaoDeGenHook.TimelockNotExpired.selector);
+        hook.executePause();
+
+        // Warp past timelock
+        vm.warp(block.timestamp + 2 days);
+
+        hook.executePause();
+        assertFalse(hook.paused());
+        assertEq(hook.pauseScheduledAt(), 0);
+    }
+
+    function test_Unpause_CannotExecuteEarly() public {
+        hook.schedulePause(true);
+        hook.schedulePause(false);
+
+        // Try 1 second before timelock expires
+        vm.warp(block.timestamp + 2 days - 1);
+        vm.expectRevert(DaoDeGenHook.TimelockNotExpired.selector);
+        hook.executePause();
+    }
+
+    function test_ExecutePause_RevertsIfNoneScheduled() public {
+        vm.expectRevert(DaoDeGenHook.NoPauseScheduled.selector);
+        hook.executePause();
+    }
+
+    function test_NotOwnerCannotSchedulePause() public {
+        address nonOwner = makeAddr("nonOwner");
+        vm.prank(nonOwner);
+        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
+        hook.schedulePause(true);
+    }
+
+    function test_NotOwnerCannotExecutePause() public {
+        hook.schedulePause(true);
+        hook.schedulePause(false);
+
+        vm.warp(block.timestamp + 2 days);
+
+        address nonOwner = makeAddr("nonOwner");
+        vm.prank(nonOwner);
+        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
+        hook.executePause();
+    }
+
+    function test_SchedulePause_EmitsEvent() public {
+        // Emergency pause emits HookPauseChanged
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.HookPauseChanged(true);
+        hook.schedulePause(true);
+
+        // Scheduling unpause emits PauseScheduled
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.PauseScheduled(false, block.timestamp + 2 days);
+        hook.schedulePause(false);
+    }
+
+    function test_ExecutePause_EmitsEvent() public {
+        hook.schedulePause(true);
+        hook.schedulePause(false);
+        vm.warp(block.timestamp + 2 days);
+
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.HookPauseChanged(false);
+        hook.executePause();
+    }
+
+    function test_EmergencyPause_ClearsPendingSchedule() public {
+        // Schedule an unpause
+        hook.schedulePause(true);
+        hook.schedulePause(false);
+        assertGt(hook.pauseScheduledAt(), 0);
+
+        // Emergency pause again should clear pending schedule
+        hook.schedulePause(true);
+        assertEq(hook.pauseScheduledAt(), 0);
+        assertTrue(hook.paused());
+    }
+
+    function test_FullLifecycle_PauseTimelockUnpause() public {
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(makeAddr("token1")),
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: IHooks(address(hook))
+        });
+
+        SwapParams memory params = SwapParams({
+            zeroForOne: true,
+            amountSpecified: -1 ether,
+            sqrtPriceLimitX96: 0
+        });
+
+        BalanceDelta delta = toBalanceDelta(-1 ether, 2000 ether);
+
         vm.mockCall(
             address(manager),
             abi.encodeWithSelector(IPoolManager.take.selector),
             abi.encode()
         );
 
-        // Should work now
+        // 1. Swaps work initially
+        vm.prank(address(manager));
+        hook.afterSwap(address(0), key, params, delta, "");
+
+        // 2. Emergency pause — instant
+        hook.schedulePause(true);
+
+        vm.prank(address(manager));
+        vm.expectRevert(DaoDeGenHook.HookPaused.selector);
+        hook.afterSwap(address(0), key, params, delta, "");
+
+        // 3. Schedule unpause — must wait
+        hook.schedulePause(false);
+
+        vm.prank(address(manager));
+        vm.expectRevert(DaoDeGenHook.HookPaused.selector);
+        hook.afterSwap(address(0), key, params, delta, "");
+
+        // 4. After timelock — execute unpause
+        vm.warp(block.timestamp + 2 days);
+        hook.executePause();
+
         vm.prank(address(manager));
         (bytes4 selector,) = hook.afterSwap(address(0), key, params, delta, "");
         assertEq(selector, IHooks.afterSwap.selector);
     }
 
-    function test_NotOwnerCannotPause() public {
-        address nonOwner = makeAddr("nonOwner");
-        vm.prank(nonOwner);
-        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
-        hook.setPaused(true);
-    }
-
-    function test_SetPausedEmitsEvent() public {
-        vm.expectEmit(true, true, true, true);
-        emit DaoDeGenHook.HookPauseChanged(true);
-        hook.setPaused(true);
-
-        vm.expectEmit(true, true, true, true);
-        emit DaoDeGenHook.HookPauseChanged(false);
-        hook.setPaused(false);
+    function test_TimelockDelayIs2Days() public view {
+        assertEq(hook.TIMELOCK_DELAY(), 2 days);
     }
 
     // -------------------------------------------------------------------------
@@ -197,32 +307,35 @@ contract DaoDeGenHookTest is Test {
 
     function test_AfterSwap_ETHFeeAccrues() public {
         PoolKey memory key = PoolKey({
-            currency0: Currency.wrap(address(0)), // ETH
+            currency0: Currency.wrap(address(0)),
             currency1: Currency.wrap(makeAddr("token1")),
             fee: 3000,
             tickSpacing: 60,
             hooks: IHooks(address(hook))
         });
 
-        // specifiedTokenIs0 = (amountSpecified < 0) == zeroForOne
-        // amountSpecified = -1e18 (< 0) and zeroForOne = false → (true != false) → false
-        // feeCurrency = currency0 (ETH)
         SwapParams memory params = SwapParams({
             zeroForOne: false,
             amountSpecified: -1 ether,
             sqrtPriceLimitX96: 0
         });
 
-        // delta.amount0 = 2000 ether (positive output of ETH), fee = 1% = 20 ether
         BalanceDelta delta = toBalanceDelta(2000 ether, -1 ether);
         uint256 expectedFee = 20 ether;
+
+        // Mock manager.take() and fund the hook with ETH for forwarding to jar
+        vm.mockCall(
+            address(manager),
+            abi.encodeWithSelector(IPoolManager.take.selector),
+            abi.encode()
+        );
+        vm.deal(address(hook), expectedFee);
 
         vm.prank(address(manager));
         (bytes4 selector, int128 feeReturned) = hook.afterSwap(address(0), key, params, delta, "");
 
         assertEq(selector, IHooks.afterSwap.selector);
         assertEq(uint128(feeReturned), expectedFee);
-        // Fees go directly to jar within the same unlock (no accruedFees staging)
         assertEq(address(jar).balance, expectedFee);
     }
 
@@ -243,7 +356,6 @@ contract DaoDeGenHookTest is Test {
 
         BalanceDelta delta = toBalanceDelta(-1 ether, 2000 ether);
 
-        // Call from non-manager address should revert
         address nonManager = makeAddr("notManager");
         vm.prank(nonManager);
         vm.expectRevert(DaoDeGenHook.OnlyPoolManager.selector);

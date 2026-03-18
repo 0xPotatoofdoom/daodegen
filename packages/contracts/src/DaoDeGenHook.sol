@@ -34,11 +34,23 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
     uint256 public constant FEE_BPS = 100;   // 1%
     uint256 public constant TOTAL_BPS = 10000;
 
+    /// @notice Timelock delay for non-emergency pause changes (unpause).
+    uint256 public constant TIMELOCK_DELAY = 2 days;
+
+    /// @notice Timestamp when a pause state change was scheduled (0 = none pending).
+    uint256 public pauseScheduledAt;
+
+    /// @notice The pause value that was scheduled.
+    bool public scheduledPauseValue;
+
     error OnlyPoolManager();
     error InvalidAddress();
     error HookPaused();
     error NotOwner();
+    error NoPauseScheduled();
+    error TimelockNotExpired();
 
+    event PauseScheduled(bool paused, uint256 executeAfter);
     event HookPauseChanged(bool paused);
     event FeesAccrued(Currency indexed currency, uint256 amount);
 
@@ -59,10 +71,35 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
         owner = msg.sender;
     }
 
-    function setPaused(bool _paused) external {
+    /// @notice Schedule a pause state change. Emergency pauses (paused=true) execute
+    ///         instantly. Unpauses require a 2-day timelock so users can react.
+    /// @param _paused The desired pause state.
+    function schedulePause(bool _paused) external {
         if (msg.sender != owner) revert NotOwner();
-        paused = _paused;
-        emit HookPauseChanged(_paused);
+
+        // Emergency pause: execute immediately, no timelock needed.
+        if (_paused) {
+            paused = true;
+            pauseScheduledAt = 0;
+            emit HookPauseChanged(true);
+            return;
+        }
+
+        // Schedule unpause with timelock
+        pauseScheduledAt = block.timestamp;
+        scheduledPauseValue = _paused;
+        emit PauseScheduled(_paused, block.timestamp + TIMELOCK_DELAY);
+    }
+
+    /// @notice Execute a previously scheduled pause state change after the timelock.
+    function executePause() external {
+        if (msg.sender != owner) revert NotOwner();
+        if (pauseScheduledAt == 0) revert NoPauseScheduled();
+        if (block.timestamp < pauseScheduledAt + TIMELOCK_DELAY) revert TimelockNotExpired();
+
+        paused = scheduledPauseValue;
+        pauseScheduledAt = 0;
+        emit HookPauseChanged(scheduledPauseValue);
     }
 
     // ── Hook callbacks ──────────────────────────────────────────
