@@ -25,35 +25,21 @@ const PASTOR_PRIVATE_KEY = process.env.PASTOR_PRIVATE_KEY as
 
 const SECRET_KEY = new TextEncoder().encode(env.JWT_SECRET);
 const WALLET_COOLDOWN_MS = 60_000;
+const WALLET_COOLDOWN_S = Math.ceil(WALLET_COOLDOWN_MS / 1000);
 
-// Sermon cooldown — uses Redis when REDIS_URL is set, memory otherwise
-const walletLastSermon: { get(k: string): number | undefined; set(k: string, v: number): void; delete(k: string): void; entries(): Iterable<[string, number]> } = (() => {
-  if (process.env.REDIS_URL) {
-    try {
-      const { getRedis } = require("@/lib/stores/redis");
-      const redis = getRedis();
-      const prefix = "sermon-cooldown:";
-      const cache = new Map<string, number>();
-      return {
-        get: (k: string) => cache.get(k),
-        set: (k: string, v: number) => {
-          cache.set(k, v);
-          redis.set(prefix + k, String(v), "EX", Math.ceil(WALLET_COOLDOWN_MS * 2 / 1000)).catch(() => {});
-        },
-        delete: (k: string) => { cache.delete(k); redis.del(prefix + k).catch(() => {}); },
-        entries: () => cache.entries(),
-      };
-    } catch { /* fall through to memory */ }
-  }
-  return new Map<string, number>();
-})();
+// Sermon cooldown — Redis is the source of truth (TTL handles cleanup)
+import { getRedis } from "@/lib/stores/redis";
+const _sermonRedis = getRedis();
+const COOLDOWN_PREFIX = "sermon-cooldown:";
 
-setInterval(() => {
-  const cutoff = Date.now() - WALLET_COOLDOWN_MS * 2;
-  for (const [wallet, ts] of walletLastSermon.entries()) {
-    if (ts < cutoff) walletLastSermon.delete(wallet);
-  }
-}, 5 * 60_000);
+async function getWalletCooldown(wallet: string): Promise<number | null> {
+  const val = await _sermonRedis.get(COOLDOWN_PREFIX + wallet);
+  return val ? Number(val) : null;
+}
+
+async function setWalletCooldown(wallet: string): Promise<void> {
+  await _sermonRedis.set(COOLDOWN_PREFIX + wallet, String(Date.now()), "EX", WALLET_COOLDOWN_S * 2);
+}
 const VALID_PRAYER_TYPES: PrayerType[] = [
   "prayer",
   "confession",
@@ -123,7 +109,7 @@ export async function POST(req: NextRequest) {
   const burnAmount = /^\d+(\.\d+)?$/.test(rawBurn) ? rawBurn : "0";
   const message = body.message ?? "";
   const now = Date.now();
-  const lastSermon = walletLastSermon.get(senderAddress);
+  const lastSermon = await getWalletCooldown(senderAddress);
   if (lastSermon && now - lastSermon < WALLET_COOLDOWN_MS) {
     const retryAfter = Math.ceil((WALLET_COOLDOWN_MS - (now - lastSermon)) / 1000);
     return apiError(429, Errors.SERMON_COOLDOWN, { retryAfter }, { "Retry-After": String(retryAfter) }, traceId);
@@ -144,7 +130,7 @@ export async function POST(req: NextRequest) {
     log.error({ err }, 'Sermon generation failed, using fallback');
     sermon = generateFallbackSermon(safeMessage, verses);
   }
-  walletLastSermon.set(senderAddress, Date.now());
+  await setWalletCooldown(senderAddress);
   recordPrayer(senderAddress, sermon.sentiment_tag as SentimentTag);
 
   // ---Get Prayer ID from Ponder indexer---
