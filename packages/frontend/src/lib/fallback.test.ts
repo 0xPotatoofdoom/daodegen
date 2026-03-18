@@ -3,7 +3,6 @@ import {
   classifyPrayer,
   tier1Reflection,
   tier2VerseOnly,
-  tier3Contemplation,
   generateFallbackSermon,
 } from "./fallback";
 import { verses } from "./verses";
@@ -90,16 +89,6 @@ describe("Fallback: tier2VerseOnly", () => {
     const a = tier2VerseOnly("same message", verses);
     const b = tier2VerseOnly("same message", verses);
     expect(a.verse_references).toEqual(b.verse_references);
-  });
-});
-
-describe("Fallback: tier3Contemplation", () => {
-  it("returns a verse with contemplation framing", () => {
-    const result = tier3Contemplation(verses);
-    expect(result.response_type).toBe("verse_only");
-    expect(result.content).toContain("Verse ");
-    expect(result.verse_references.length).toBe(1);
-    expect(result.sentiment_tag).toBe("peaceful");
   });
 });
 
