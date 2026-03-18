@@ -1,5 +1,6 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
+import Redis from "ioredis";
 import {
   createPublicClient,
   createWalletClient,
@@ -163,31 +164,27 @@ function readBody(req: IncomingMessage): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// Rate limiter (in-memory, no deps)
+// Redis
 // ---------------------------------------------------------------------------
 
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 60; // 60 req/min per IP
+const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
+redis.on("error", (err) => console.error("[redis]", err));
 
-const ipCounts = new Map<string, { count: number; resetAt: number }>();
+// ---------------------------------------------------------------------------
+// Rate limiter (Redis — survives restarts, works across instances)
+// ---------------------------------------------------------------------------
 
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = ipCounts.get(ip);
-  if (!entry || now > entry.resetAt) {
-    ipCounts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
+const RATE_LIMIT_WINDOW_S = 60;
+const RATE_LIMIT_MAX = 60; // 60 req per 60s window per IP
+
+async function isRateLimited(ip: string): Promise<boolean> {
+  const key = `ratelimit:${ip}`;
+  const count = await redis.incr(key);
+  if (count === 1) {
+    await redis.expire(key, RATE_LIMIT_WINDOW_S);
   }
-  entry.count++;
-  return entry.count > RATE_LIMIT_MAX;
+  return count > RATE_LIMIT_MAX;
 }
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of ipCounts) {
-    if (now > entry.resetAt) ipCounts.delete(ip);
-  }
-}, 5 * 60_000);
 
 // ---------------------------------------------------------------------------
 // Request router
@@ -199,7 +196,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   const ip = req.socket.remoteAddress || "unknown";
   const traceId = getTraceId(req);
 
-  if (isRateLimited(ip)) {
+  if (await isRateLimited(ip)) {
     json(req, res, 429, { error: "Too many requests" }, traceId);
     return;
   }
@@ -305,8 +302,10 @@ server.listen(PORT, () => {
 function shutdown() {
   console.log("Shutting down gracefully...");
   server.close(() => {
-    console.log("Server closed.");
-    process.exit(0);
+    redis.quit().then(() => {
+      console.log("Server closed.");
+      process.exit(0);
+    });
   });
   // Force exit after 10s if connections don't drain
   setTimeout(() => process.exit(1), 10_000).unref();
