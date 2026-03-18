@@ -33,13 +33,21 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
     bool public paused;
     uint256 public constant FEE_BPS = 100;   // 1%
     uint256 public constant TOTAL_BPS = 10000;
+    uint256 public constant PAUSE_TIMELOCK = 2 days;
+
+    bool public pendingPaused;
+    uint256 public pauseScheduledAt;
 
     error OnlyPoolManager();
     error InvalidAddress();
     error HookPaused();
     error NotOwner();
+    error NoPendingPause();
+    error TimelockNotElapsed();
 
-    event HookPauseChanged(bool paused);
+    event PauseScheduled(bool paused, uint256 executeAfter);
+    event PauseExecuted(bool paused);
+    event PauseCancelled();
     event FeesAccrued(Currency indexed currency, uint256 amount);
 
     modifier whenNotPaused() {
@@ -59,10 +67,37 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
         owner = msg.sender;
     }
 
-    function setPaused(bool _paused) external {
+    /// @notice Schedule a pause state change. Unpausing when currently paused is instant (emergency escape).
+    function schedulePause(bool _paused) external {
         if (msg.sender != owner) revert NotOwner();
-        paused = _paused;
-        emit HookPauseChanged(_paused);
+        // Emergency unpause: if protocol is currently paused and owner wants to unpause, apply instantly
+        if (paused && !_paused) {
+            paused = false;
+            pauseScheduledAt = 0;
+            emit PauseExecuted(false);
+            return;
+        }
+        pendingPaused = _paused;
+        pauseScheduledAt = block.timestamp;
+        emit PauseScheduled(_paused, block.timestamp + PAUSE_TIMELOCK);
+    }
+
+    /// @notice Execute a scheduled pause after the timelock has elapsed.
+    function executePause() external {
+        if (msg.sender != owner) revert NotOwner();
+        if (pauseScheduledAt == 0) revert NoPendingPause();
+        if (block.timestamp < pauseScheduledAt + PAUSE_TIMELOCK) revert TimelockNotElapsed();
+        paused = pendingPaused;
+        pauseScheduledAt = 0;
+        emit PauseExecuted(pendingPaused);
+    }
+
+    /// @notice Cancel a pending pause schedule.
+    function cancelPause() external {
+        if (msg.sender != owner) revert NotOwner();
+        if (pauseScheduledAt == 0) revert NoPendingPause();
+        pauseScheduledAt = 0;
+        emit PauseCancelled();
     }
 
     // ── Hook callbacks ──────────────────────────────────────────

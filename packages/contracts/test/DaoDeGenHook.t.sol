@@ -99,7 +99,112 @@ contract DaoDeGenHookTest is Test {
         assertEq(fee, 0);
     }
 
-    function test_HookPause() public {
+    // -------------------------------------------------------------------------
+    // Timelock pause tests
+    // -------------------------------------------------------------------------
+
+    function test_SchedulePause_SetsStateAndEmits() public {
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.PauseScheduled(true, block.timestamp + 2 days);
+        hook.schedulePause(true);
+
+        assertEq(hook.pendingPaused(), true);
+        assertEq(hook.pauseScheduledAt(), block.timestamp);
+    }
+
+    function test_ExecutePause_RevertsBeforeTimelock() public {
+        hook.schedulePause(true);
+
+        // Warp forward less than 2 days
+        vm.warp(block.timestamp + 1 days);
+
+        vm.expectRevert(DaoDeGenHook.TimelockNotElapsed.selector);
+        hook.executePause();
+    }
+
+    function test_ExecutePause_WorksAfterTimelock() public {
+        hook.schedulePause(true);
+
+        // Warp forward 2 days
+        vm.warp(block.timestamp + 2 days);
+
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.PauseExecuted(true);
+        hook.executePause();
+
+        assertTrue(hook.paused());
+        assertEq(hook.pauseScheduledAt(), 0);
+    }
+
+    function test_EmergencyUnpause_IsInstant() public {
+        // First, pause the hook via timelock
+        hook.schedulePause(true);
+        vm.warp(block.timestamp + 2 days);
+        hook.executePause();
+        assertTrue(hook.paused());
+
+        // Emergency unpause should be instant — no timelock
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.PauseExecuted(false);
+        hook.schedulePause(false);
+
+        assertFalse(hook.paused());
+        assertEq(hook.pauseScheduledAt(), 0);
+    }
+
+    function test_CancelPause_ClearsPending() public {
+        hook.schedulePause(true);
+        assertGt(hook.pauseScheduledAt(), 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.PauseCancelled();
+        hook.cancelPause();
+
+        assertEq(hook.pauseScheduledAt(), 0);
+    }
+
+    function test_CancelPause_RevertsIfNoPending() public {
+        vm.expectRevert(DaoDeGenHook.NoPendingPause.selector);
+        hook.cancelPause();
+    }
+
+    function test_ExecutePause_RevertsIfNoPending() public {
+        vm.expectRevert(DaoDeGenHook.NoPendingPause.selector);
+        hook.executePause();
+    }
+
+    function test_SchedulePause_RevertsForNonOwner() public {
+        address nonOwner = makeAddr("nonOwner");
+        vm.prank(nonOwner);
+        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
+        hook.schedulePause(true);
+    }
+
+    function test_ExecutePause_RevertsForNonOwner() public {
+        hook.schedulePause(true);
+        vm.warp(block.timestamp + 2 days);
+
+        address nonOwner = makeAddr("nonOwner");
+        vm.prank(nonOwner);
+        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
+        hook.executePause();
+    }
+
+    function test_CancelPause_RevertsForNonOwner() public {
+        hook.schedulePause(true);
+
+        address nonOwner = makeAddr("nonOwner");
+        vm.prank(nonOwner);
+        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
+        hook.cancelPause();
+    }
+
+    function test_PausedHook_BlocksAfterSwap() public {
+        // Pause the hook via timelock
+        hook.schedulePause(true);
+        vm.warp(block.timestamp + 2 days);
+        hook.executePause();
+
         PoolKey memory key = PoolKey({
             currency0: Currency.wrap(address(0)),
             currency1: Currency.wrap(makeAddr("token1")),
@@ -116,16 +221,27 @@ contract DaoDeGenHookTest is Test {
 
         BalanceDelta delta = toBalanceDelta(-1 ether, 2000 ether);
 
-        // Pause the hook
-        hook.setPaused(true);
-
-        // afterSwap should revert
         vm.prank(address(manager));
         vm.expectRevert(DaoDeGenHook.HookPaused.selector);
         hook.afterSwap(address(0), key, params, delta, "");
+    }
 
-        // Unpause
-        hook.setPaused(false);
+    function test_FullPauseUnpauseCycle() public {
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(makeAddr("token1")),
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: IHooks(address(hook))
+        });
+
+        SwapParams memory params = SwapParams({
+            zeroForOne: true,
+            amountSpecified: -1 ether,
+            sqrtPriceLimitX96: 0
+        });
+
+        BalanceDelta delta = toBalanceDelta(-1 ether, 2000 ether);
 
         // Mock manager.take()
         vm.mockCall(
@@ -134,27 +250,27 @@ contract DaoDeGenHookTest is Test {
             abi.encode()
         );
 
-        // Should work now
+        // 1. Schedule pause
+        hook.schedulePause(true);
+
+        // 2. Execute after timelock
+        vm.warp(block.timestamp + 2 days);
+        hook.executePause();
+        assertTrue(hook.paused());
+
+        // 3. afterSwap blocked
+        vm.prank(address(manager));
+        vm.expectRevert(DaoDeGenHook.HookPaused.selector);
+        hook.afterSwap(address(0), key, params, delta, "");
+
+        // 4. Emergency unpause (instant)
+        hook.schedulePause(false);
+        assertFalse(hook.paused());
+
+        // 5. afterSwap works again
         vm.prank(address(manager));
         (bytes4 selector,) = hook.afterSwap(address(0), key, params, delta, "");
         assertEq(selector, IHooks.afterSwap.selector);
-    }
-
-    function test_NotOwnerCannotPause() public {
-        address nonOwner = makeAddr("nonOwner");
-        vm.prank(nonOwner);
-        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
-        hook.setPaused(true);
-    }
-
-    function test_SetPausedEmitsEvent() public {
-        vm.expectEmit(true, true, true, true);
-        emit DaoDeGenHook.HookPauseChanged(true);
-        hook.setPaused(true);
-
-        vm.expectEmit(true, true, true, true);
-        emit DaoDeGenHook.HookPauseChanged(false);
-        hook.setPaused(false);
     }
 
     // -------------------------------------------------------------------------
