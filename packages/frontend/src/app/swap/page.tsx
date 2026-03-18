@@ -25,6 +25,8 @@ export default function SwapPage() {
 
   // Quote state
   const [quote, setQuote] = useState<DirectQuote | null>(null)
+  const [quoteFetchedAt, setQuoteFetchedAt] = useState<number | null>(null)
+  const [quoteStale, setQuoteStale] = useState(false)
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [quoteError, setQuoteError] = useState<string | null>(null)
 
@@ -61,6 +63,8 @@ export default function SwapPage() {
         )
         if (!controller.signal.aborted) {
           setQuote(result)
+          setQuoteFetchedAt(Date.now())
+          setQuoteStale(false)
           setQuoteError(null)
           setQuoteLoading(false)
         }
@@ -78,6 +82,22 @@ export default function SwapPage() {
       controller.abort()
     }
   }, [ethAmount, address, isCorrectChain, activeSlippage])
+
+  // Mark quote as stale after 30 seconds
+  useEffect(() => {
+    if (!quoteFetchedAt || !quote) {
+      setQuoteStale(false)
+      return
+    }
+    const elapsed = Date.now() - quoteFetchedAt
+    const remaining = 30_000 - elapsed
+    if (remaining <= 0) {
+      setQuoteStale(true)
+      return
+    }
+    const timer = setTimeout(() => setQuoteStale(true), remaining)
+    return () => clearTimeout(timer)
+  }, [quoteFetchedAt, quote])
 
   // Handle swap — direct V4 via UniversalRouter
   const handleSwap = useCallback(async () => {
@@ -100,6 +120,8 @@ export default function SwapPage() {
   const handleReset = useCallback(() => {
     setEthAmount('')
     setQuote(null)
+    setQuoteFetchedAt(null)
+    setQuoteStale(false)
     setQuoteError(null)
     setSwapApiError(null)
     resetTx()
@@ -109,7 +131,7 @@ export default function SwapPage() {
   const ethNum = parseFloat(ethAmount) || 0
   const insufficientBalance = balance && ethNum > parseFloat(balance.formatted)
   const outputAmount = quote ? formatUnits(quote.amountOut, 18) : null
-  const canSwap = isConnected && isCorrectChain && quote && !quoteLoading && !insufficientBalance && ethNum > 0 && !swapPending && !swapConfirming
+  const canSwap = isConnected && isCorrectChain && quote && !quoteLoading && !quoteStale && !insufficientBalance && ethNum > 0 && !swapPending && !swapConfirming
 
   const getButtonText = () => {
     if (!isConnected) return 'Connect Wallet'
@@ -117,6 +139,7 @@ export default function SwapPage() {
     if (!ethAmount || ethNum <= 0) return 'Enter Amount'
     if (insufficientBalance) return 'Insufficient ETH Balance'
     if (quoteLoading) return 'Fetching Quote...'
+    if (quoteStale) return 'Quote expired — refresh to continue'
     if (quoteError) return 'Quote Unavailable'
     if (swapPending) return 'Confirm in Wallet...'
     if (swapConfirming) return 'Confirming...'
