@@ -31,3 +31,4 @@ test-results/
 packages/frontend/.env.production
 packages/frontend/.env.local
 packages/contracts/.env
+packages/facilitator/dist/
