@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:mainnet": "BASE_URL=https://0xdead.church npx playwright test --config=playwright.visual-qa.config.ts",
     "health-check": "node scripts/health-check.js"
   },
   "dependencies": {

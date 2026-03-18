@@ -8,6 +8,12 @@ on:
   schedule:
     # Nightly at 06:00 UTC -- runs paid E2E flow against testnet
     - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      run_mainnet_e2e:
+        description: 'Run Visual QA against mainnet (0xdead.church)'
+        required: false
+        default: 'true'
 
 jobs:
   contracts:
@@ -119,11 +125,12 @@ jobs:
           FACILITATOR_PRIVATE_KEY: ${{ secrets.FACILITATOR_PRIVATE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           E2E_PAYER_PRIVATE_KEY: ${{ secrets.E2E_PAYER_PRIVATE_KEY }}
-      - name: Run Visual QA tests
+      - name: Run Visual QA tests (localhost)
         run: npx playwright test --config=playwright.visual-qa.config.ts
         working-directory: packages/frontend
         env:
           CI: true
+          BASE_URL: 'http://localhost:3031'
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -131,6 +138,37 @@ jobs:
           name: playwright-report
           path: packages/frontend/playwright-report/
           retention-days: 14
+
+  e2e-mainnet:
+    name: Visual QA (mainnet — 0xdead.church)
+    # Run on schedule (nightly) or manually via workflow_dispatch.
+    # Does NOT run on every PR to avoid hammering the live site.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm install
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: packages/frontend
+      - name: Run Visual QA tests against mainnet
+        run: npx playwright test --config=playwright.visual-qa.config.ts
+        working-directory: packages/frontend
+        env:
+          CI: true
+          BASE_URL: 'https://0xdead.church'
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-mainnet
+          path: packages/frontend/playwright-report/
+          retention-days: 30
 
   verify-contracts:
     needs: [contracts]
