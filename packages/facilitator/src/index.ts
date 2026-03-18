@@ -103,6 +103,14 @@ console.log(`Supported:`, JSON.stringify(facilitator.getSupported(), null, 2));
 
 const isDev = process.env.NODE_ENV !== 'production';
 
+if (!isDev && !process.env.FRONTEND_ORIGIN) {
+  console.error(
+    "FATAL: FRONTEND_ORIGIN must be set in production (e.g. https://daodegen.xyz). " +
+    "Without it, CORS will reject every cross-origin request.",
+  );
+  process.exit(1);
+}
+
 const ALLOWED_ORIGINS = new Set([
   ...(isDev ? ["http://localhost:3033", "http://localhost:3031"] : []),
   process.env.FRONTEND_ORIGIN,
