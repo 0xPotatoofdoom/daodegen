@@ -15,6 +15,7 @@ contract SermonCommitment {
     // --- State ---
     address public pastor;
     address public owner;
+    address public trustedCaller;
 
     // --- Types ---
     struct Commitment {
@@ -32,19 +33,28 @@ contract SermonCommitment {
     event CommitmentCreated(bytes32 indexed id, address indexed supplicant, uint256 burnAmount, uint256 deadline);
     event CommitmentFulfilled(bytes32 indexed id, bytes32 wisdomHash, address pastor);
     event CommitmentRefunded(bytes32 indexed id, address supplicant);
+    event TrustedCallerUpdated(address indexed oldCaller, address indexed newCaller);
 
     // --- Errors ---
     error OnlyPastor();
     error OnlyOwner();
+    error OnlyTrustedCaller();
     error CommitmentNotFound();
     error AlreadyFulfilled();
     error AlreadyRefunded();
     error DeadlineNotReached();
     error ZeroAddress();
 
-    constructor(address _pastor) {
+    modifier onlyTrustedCaller() {
+        if (trustedCaller == address(0)) revert OnlyTrustedCaller();
+        if (msg.sender != trustedCaller) revert OnlyTrustedCaller();
+        _;
+    }
+
+    constructor(address _pastor, address _trustedCaller) {
         if (_pastor == address(0)) revert ZeroAddress();
         pastor = _pastor;
+        trustedCaller = _trustedCaller;
         owner = msg.sender;
     }
 
@@ -52,7 +62,7 @@ contract SermonCommitment {
     /// @param supplicant The address that burned tokens.
     /// @param burnAmount The number of tokens burned.
     /// @return id The unique commitment identifier.
-    function createCommitment(address supplicant, uint256 burnAmount) external returns (bytes32 id) {
+    function createCommitment(address supplicant, uint256 burnAmount) external onlyTrustedCaller returns (bytes32 id) {
         id = keccak256(abi.encodePacked(supplicant, burnAmount, block.timestamp, block.number));
         uint256 deadline = block.timestamp + FULFILLMENT_WINDOW;
 
@@ -105,5 +115,13 @@ contract SermonCommitment {
         if (msg.sender != owner) revert OnlyOwner();
         if (_pastor == address(0)) revert ZeroAddress();
         pastor = _pastor;
+    }
+
+    /// @notice Update the trusted caller (PrayerBurn contract).
+    function setTrustedCaller(address _trustedCaller) external {
+        if (msg.sender != owner) revert OnlyOwner();
+        address old = trustedCaller;
+        trustedCaller = _trustedCaller;
+        emit TrustedCallerUpdated(old, _trustedCaller);
     }
 }
