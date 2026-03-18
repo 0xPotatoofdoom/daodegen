@@ -176,6 +176,54 @@ contract VerseNFTTest is Test {
         uint256 finalBalance = address(this).balance;
 
         assertEq(finalBalance - initialBalance, price);
+        assertEq(verseNFT.withdrawable(), 0);
+    }
+
+    function testWithdrawOnlyDrainsTrackedAmount() public {
+        // Send extra ETH directly to contract (simulating protocol reserves)
+        vm.deal(address(verseNFT), 5 ether);
+
+        // Mint — only mint proceeds should be withdrawable
+        vm.deal(user1, 1 ether);
+        uint256 price = verseNFT.mintPrice();
+        vm.prank(user1);
+        verseNFT.mint{value: price}();
+
+        assertEq(verseNFT.withdrawable(), price);
+
+        uint256 initialBalance = address(this).balance;
+        verseNFT.withdraw();
+        uint256 finalBalance = address(this).balance;
+
+        // Owner receives only the mint proceeds, not the 5 ETH reserve
+        assertEq(finalBalance - initialBalance, price);
+        // Contract still holds the reserve
+        assertEq(address(verseNFT).balance, 5 ether);
+    }
+
+    function testWithdrawAccumulatesAcrossMints() public {
+        verseNFT.setMintCooldown(0);
+        vm.deal(user1, 100 ether);
+
+        uint256 price1 = verseNFT.mintPrice();
+        vm.prank(user1);
+        verseNFT.mint{value: price1}();
+
+        uint256 price2 = verseNFT.mintPrice();
+        vm.prank(user1);
+        verseNFT.mint{value: price2}();
+
+        assertEq(verseNFT.withdrawable(), price1 + price2);
+
+        uint256 initialBalance = address(this).balance;
+        verseNFT.withdraw();
+        assertEq(address(this).balance - initialBalance, price1 + price2);
+        assertEq(verseNFT.withdrawable(), 0);
+
+        // Second withdraw sends nothing
+        uint256 balBefore = address(this).balance;
+        verseNFT.withdraw();
+        assertEq(address(this).balance, balBefore);
     }
 
     function testTokenURI() public {

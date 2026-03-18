@@ -19,6 +19,7 @@ contract VerseNFT is ERC721Enumerable, Ownable, Pausable {
     uint256 public mintCooldown;
     string public baseTokenURI;
     uint256 private _nextTokenId = 1;
+    uint256 public withdrawable;
 
     mapping(address => uint256) public lastMintTimestamp;
 
@@ -63,6 +64,7 @@ contract VerseNFT is ERC721Enumerable, Ownable, Pausable {
         if (_nextTokenId > MAX_SUPPLY) revert MaxSupplyReached();
 
         lastMintTimestamp[msg.sender] = block.timestamp;
+        _addWithdrawable(msg.value);
         _safeMint(msg.sender, _nextTokenId);
         _nextTokenId++;
     }
@@ -111,6 +113,12 @@ contract VerseNFT is ERC721Enumerable, Ownable, Pausable {
     function unpause() external onlyOwner { _unpause(); }
 
     function withdraw() external onlyOwner {
-        Address.sendValue(payable(msg.sender), address(this).balance);
+        uint256 amount = withdrawable;
+        withdrawable = 0;
+        Address.sendValue(payable(msg.sender), amount);
+    }
+
+    function _addWithdrawable(uint256 amount) internal {
+        withdrawable += amount;
     }
 }
