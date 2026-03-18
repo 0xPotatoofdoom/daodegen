@@ -127,7 +127,7 @@ export interface DirectQuote {
 
 /**
  * Fetch a real quote using StateView + constant-product math.
- * Falls back to a price estimate if the StateView call fails.
+ * Throws if the StateView call fails — no silent fallback.
  */
 export async function fetchDirectQuote(
   chainId: number,
@@ -168,9 +168,7 @@ export async function fetchDirectQuote(
     sqrtPriceX96 = (slot0 as readonly [bigint, number, number, number])[0]
     liquidity    = liq as bigint
   } catch {
-    // Fallback: use initial seed price (1 ETH = 1,000,000 DAODEGEN)
-    sqrtPriceX96 = 79228162514264337593543950336000n
-    liquidity    = 50000000000000000000n
+    throw new Error('Unable to fetch live quote — please try again.')
   }
 
   // Constant-product output calculation from sqrtPriceX96 and liquidity
