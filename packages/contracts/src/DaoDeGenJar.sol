@@ -101,15 +101,12 @@ contract DaoDeGenJar is Ownable, ReentrancyGuard, Pausable {
             uint256 remainder = distributable % totalNFTs;
 
             uint256 totalDistributed = 0;
-            bool first = true;
             for (uint256 j = 0; j < totalNFTs; j++) {
                 uint256 tokenId = nft.tokenByIndex(j);
                 uint256 amount = perHolder;
 
-                if (first && remainder > 0) {
+                if (j == totalNFTs - 1 && remainder > 0) {
                     amount += remainder;
-                    remainder = 0;
-                    first = false;
                 }
 
                 if (amount > 0) {
