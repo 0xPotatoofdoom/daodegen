@@ -64,7 +64,14 @@ app.get("/prayers/tx/:txHash", async (c) => {
 
 // GET /claims/:tokenId -- claims for an NFT
 app.get("/claims/:tokenId", async (c) => {
-  const tokenId = BigInt(c.req.param("tokenId"));
+  const raw = c.req.param("tokenId");
+  if (!/^\d+$/.test(raw)) {
+    return c.json(
+      { error: "Invalid tokenId — must be a non-negative integer" },
+      400,
+    );
+  }
+  const tokenId = BigInt(raw);
 
   const result = await db
     .select()

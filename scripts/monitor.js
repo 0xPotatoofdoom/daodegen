@@ -51,6 +51,26 @@ const CONFIG = {
   stateFile:         process.env.MONITOR_STATE_FILE || '/tmp/daodegen-monitor-state.json',
 };
 
+// ── Helpers: BigInt-safe ETH formatting ──────────────────────────────────────
+
+/** Convert a float ETH threshold to wei (BigInt). */
+function ethToWei(eth) {
+  // Multiply by 1e18 via string to avoid float precision issues
+  const [whole = '0', frac = ''] = String(eth).split('.');
+  const padded = (frac + '000000000000000000').slice(0, 18);
+  return BigInt(whole) * 10n ** 18n + BigInt(padded);
+}
+
+/** Format wei (BigInt) as a decimal ETH string with 6 decimal places. */
+function weiToEthString(wei) {
+  const sign = wei < 0n ? '-' : '';
+  const abs = wei < 0n ? -wei : wei;
+  const whole = abs / 10n ** 18n;
+  const remainder = abs % 10n ** 18n;
+  const frac = remainder.toString().padStart(18, '0').slice(0, 6);
+  return `${sign}${whole}.${frac}`;
+}
+
 // ── State (throttle duplicate alerts) ────────────────────────────────────────
 
 function loadState() {
@@ -150,9 +170,8 @@ async function checkJarBalance() {
     // eth_getBalance for the jar contract
     const hex = await rpcCall('eth_getBalance', [CONFIG.jarAddress, 'latest']);
     const wei = BigInt(hex || '0x0');
-    const eth = Number(wei) / 1e18;
-    const alert = eth > CONFIG.jarAlertEth;
-    return { name: 'jar_balance', eth, alert, ok: true };
+    const alert = wei > ethToWei(CONFIG.jarAlertEth);
+    return { name: 'jar_balance', eth: weiToEthString(wei), alert, ok: true };
   } catch (err) {
     return { name: 'jar_balance', ok: false, error: err.message };
   }
@@ -163,9 +182,8 @@ async function checkFacilitatorWallet() {
   try {
     const hex = await rpcCall('eth_getBalance', [CONFIG.facilitatorWallet, 'latest']);
     const wei = BigInt(hex || '0x0');
-    const eth = Number(wei) / 1e18;
-    const low = eth < CONFIG.walletLowEth;
-    return { name: 'facilitator_wallet', eth, low, ok: true };
+    const low = wei < ethToWei(CONFIG.walletLowEth);
+    return { name: 'facilitator_wallet', eth: weiToEthString(wei), low, ok: true };
   } catch (err) {
     return { name: 'facilitator_wallet', ok: false, error: err.message };
   }
@@ -246,7 +264,7 @@ async function run() {
   if (jar?.ok && jar.alert) {
     const key = 'jar_high';
     if (now - (state[key] || 0) > 4 * 60 * 60 * 1000) {
-      alerts.push(`*DaoDeGenJar* balance is high: ${jar.eth.toFixed(6)} ETH\nFees may be accumulating unclaimed — consider calling \`release()\``);
+      alerts.push(`*DaoDeGenJar* balance is high: ${jar.eth} ETH\nFees may be accumulating unclaimed — consider calling \`release()\``);
       state[key] = now;
     }
   } else if (jar?.ok && !jar.alert) {
@@ -257,7 +275,7 @@ async function run() {
   if (wallet?.ok && wallet.low) {
     const key = 'wallet_low';
     if (now - (state[key] || 0) > 60 * 60 * 1000) {
-      alerts.push(`*Facilitator wallet* is low on gas: ${wallet.eth.toFixed(6)} ETH\nAddress: \`${CONFIG.facilitatorWallet}\``);
+      alerts.push(`*Facilitator wallet* is low on gas: ${wallet.eth} ETH\nAddress: \`${CONFIG.facilitatorWallet}\``);
       state[key] = now;
     }
   } else if (wallet?.ok && !wallet.low) {
