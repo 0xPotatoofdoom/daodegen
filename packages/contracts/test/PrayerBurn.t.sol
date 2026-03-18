@@ -98,6 +98,19 @@ contract PrayerBurnTest is Test {
         vm.stopPrank();
     }
 
+    function testPrayEmitsPrayerBurnedWithoutSermonCommitment() public {
+        uint256 amount = 100e18;
+        bytes memory message = "test prayer";
+
+        vm.startPrank(user1);
+        token.approve(address(prayer), amount);
+
+        vm.expectEmit(true, false, false, true);
+        emit PrayerBurn.PrayerBurned(user1, amount, bytes32(0));
+        prayer.pray(amount, message);
+        vm.stopPrank();
+    }
+
     function testPraySilentBurn() public {
         vm.startPrank(user1);
         token.approve(address(prayer), MINIMUM_BURN);
