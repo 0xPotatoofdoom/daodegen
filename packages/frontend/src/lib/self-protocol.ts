@@ -183,16 +183,20 @@ export function getSelfUniversalLink(userId: string): string {
   return `${SELF_REDIRECT_URL}?selfApp=${encodeURIComponent(JSON.stringify(config))}`;
 }
 
-// --- Nullifier tracking (in-memory for now) ---
+// --- Nullifier tracking (Redis — permanent, survives restarts) ---
 
-const usedNullifiers = new Set<string>();
+import { getRedis } from "./stores/redis";
 
-export function isNullifierUsed(nullifier: string): boolean {
-  return usedNullifiers.has(nullifier);
+const _nullifierRedis = getRedis();
+
+export async function isNullifierUsed(nullifier: string): Promise<boolean> {
+  const exists = await _nullifierRedis.exists(`nullifier:${nullifier}`);
+  return exists === 1;
 }
 
-export function markNullifierUsed(nullifier: string): void {
-  usedNullifiers.add(nullifier);
+export async function markNullifierUsed(nullifier: string): Promise<void> {
+  // SET NX — no TTL, nullifiers must never be reused
+  await _nullifierRedis.set(`nullifier:${nullifier}`, "1", "NX");
 }
 
 export { SELF_SCOPE };
