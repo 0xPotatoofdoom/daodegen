@@ -76,9 +76,10 @@ contract SermonCommitmentTest is Test {
     }
 
     function testCreateEmitsEvent() public {
+        // nonce starts at 0 for a fresh contract
         vm.expectEmit(true, true, false, true);
         emit SermonCommitment.CommitmentCreated(
-            keccak256(abi.encodePacked(supplicant, BURN_AMOUNT, block.timestamp, block.number)),
+            keccak256(abi.encodePacked(supplicant, BURN_AMOUNT, block.timestamp, uint256(0))),
             supplicant,
             BURN_AMOUNT,
             block.timestamp + 300
@@ -305,12 +306,11 @@ contract SermonCommitmentTest is Test {
         locked.createCommitment(supplicant, BURN_AMOUNT);
     }
 
-    function testMultipleCommitmentsUnique() public {
+    function testMultipleCommitmentsUniqueSameBlock() public {
+        // Two commitments in the same block must produce different IDs (#297)
         vm.prank(prayerBurn);
         bytes32 id1 = escrow.createCommitment(supplicant, BURN_AMOUNT);
 
-        // Advance block to ensure different id
-        vm.roll(block.number + 1);
         vm.prank(prayerBurn);
         bytes32 id2 = escrow.createCommitment(supplicant, BURN_AMOUNT);
 
