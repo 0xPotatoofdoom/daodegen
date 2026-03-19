@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAgentIdentity } from '@/lib/auth';
 import { SignJWT } from 'jose';
+import { getAddress } from 'viem';
 import { reqLogger } from '@/lib/logger';
 import { apiError, Errors, getTraceId } from '@/lib/errors';
 
@@ -19,10 +20,13 @@ export async function POST(req: NextRequest) {
       return apiError(401, Errors.AUTH_INVALID_TOKEN, { reason: authResult.error }, undefined, traceId);
     }
 
-    // Create JWT
-    const token = await new SignJWT({ 
-        sub: authResult.address, 
-        agentId: authResult.agentId 
+    // Create JWT — include checksummed walletAddress so tokens are bound
+    // to the authenticated wallet (issue #312).
+    const checksumAddress = getAddress(authResult.address!);
+    const token = await new SignJWT({
+        sub: checksumAddress,
+        walletAddress: checksumAddress,
+        agentId: authResult.agentId
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()

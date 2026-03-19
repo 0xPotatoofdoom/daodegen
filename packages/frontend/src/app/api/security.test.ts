@@ -14,7 +14,7 @@ describe('API Security', () => {
     for (const routePath of routes) {
       const content = fs.readFileSync(routePath, 'utf8');
       expect(content).toContain('withX402');
-      expect(content).toContain('jwtVerify');
+      expect(content).toContain('verifyJwt');
     }
   });
 
