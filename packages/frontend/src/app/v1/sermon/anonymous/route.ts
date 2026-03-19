@@ -12,6 +12,7 @@ import {
   markNullifierUsed,
   type SelfProofPayload,
 } from "@/lib/self-protocol";
+import { getRedis } from "@/lib/stores/redis";
 
 const VALID_PRAYER_TYPES: PrayerType[] = [
   "prayer",
@@ -23,15 +24,18 @@ const VALID_PRAYER_TYPES: PrayerType[] = [
 
 // Per-nullifier cooldown to prevent rapid resubmission
 const NULLIFIER_COOLDOWN_MS = 60_000;
-const nullifierLastSermon = new Map<string, number>();
+const NULLIFIER_COOLDOWN_S = Math.ceil(NULLIFIER_COOLDOWN_MS / 1000);
+const ANON_NULLIFIER_PREFIX = "anon-nullifier:";
+const _anonRedis = getRedis();
 
-// Cleanup stale entries every 5 minutes
-setInterval(() => {
-  const cutoff = Date.now() - NULLIFIER_COOLDOWN_MS * 2;
-  for (const [nul, ts] of nullifierLastSermon) {
-    if (ts < cutoff) nullifierLastSermon.delete(nul);
-  }
-}, 5 * 60_000);
+async function getNullifierCooldown(nullifier: string): Promise<number | null> {
+  const val = await _anonRedis.get(ANON_NULLIFIER_PREFIX + nullifier);
+  return val ? Number(val) : null;
+}
+
+async function setNullifierCooldown(nullifier: string): Promise<void> {
+  await _anonRedis.set(ANON_NULLIFIER_PREFIX + nullifier, String(Date.now()), "EX", NULLIFIER_COOLDOWN_S * 2);
+}
 
 /**
  * POST /v1/sermon/anonymous
@@ -91,9 +95,9 @@ export async function POST(req: NextRequest) {
     return apiError(409, Errors.ANON_NULLIFIER_USED, undefined, undefined, traceId);
   }
 
-  // --- Nullifier cooldown ---
+  // --- Nullifier cooldown (Redis-backed, survives restarts) ---
   const now = Date.now();
-  const lastSermon = nullifierLastSermon.get(nullifier);
+  const lastSermon = await getNullifierCooldown(nullifier);
   if (lastSermon && now - lastSermon < NULLIFIER_COOLDOWN_MS) {
     const retryAfter = Math.ceil(
       (NULLIFIER_COOLDOWN_MS - (now - lastSermon)) / 1000
@@ -126,7 +130,7 @@ export async function POST(req: NextRequest) {
 
   // Mark nullifier as used and record cooldown
   await markNullifierUsed(nullifier);
-  nullifierLastSermon.set(nullifier, Date.now());
+  await setNullifierCooldown(nullifier);
 
   // Record prayer with "anonymous" sender — sentiment is still tracked
   // but no wallet address is ever associated
