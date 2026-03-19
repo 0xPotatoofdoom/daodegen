@@ -29,7 +29,8 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
 
     IPoolManager public immutable manager;
     address public immutable jar;
-    address public immutable owner;
+    address public owner;
+    address public pendingOwner;
     bool public paused;
     uint256 public constant FEE_BPS = 100;   // 1%
     uint256 public constant TOTAL_BPS = 10000;
@@ -47,9 +48,12 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
     error InvalidAddress();
     error HookPaused();
     error NotOwner();
+    error NotPendingOwner();
     error NoPauseScheduled();
     error TimelockNotExpired();
 
+    event OwnershipTransferInitiated(address indexed previousOwner, address indexed newOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event PauseScheduled(bool paused, uint256 executeAfter);
     event HookPauseChanged(bool paused);
     event FeesAccrued(Currency indexed currency, uint256 amount);
@@ -70,6 +74,30 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
         manager = _poolManager;
         jar = _jar;
         owner = msg.sender;
+    }
+
+    /// @notice Initiate ownership transfer to a new address. Must be accepted by the new owner.
+    function transferOwnership(address newOwner) external {
+        if (msg.sender != owner) revert NotOwner();
+        if (newOwner == address(0)) revert InvalidAddress();
+        pendingOwner = newOwner;
+        emit OwnershipTransferInitiated(owner, newOwner);
+    }
+
+    /// @notice Accept ownership transfer. Must be called by the pending owner.
+    function acceptOwnership() external {
+        if (msg.sender != pendingOwner) revert NotPendingOwner();
+        emit OwnershipTransferred(owner, msg.sender);
+        owner = msg.sender;
+        pendingOwner = address(0);
+    }
+
+    /// @notice Renounce ownership, setting owner to address(0). Irreversible.
+    function renounceOwnership() external {
+        if (msg.sender != owner) revert NotOwner();
+        emit OwnershipTransferred(owner, address(0));
+        owner = address(0);
+        pendingOwner = address(0);
     }
 
     /// @notice Schedule a pause state change. Emergency pauses (paused=true) execute
