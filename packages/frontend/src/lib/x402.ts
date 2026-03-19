@@ -30,19 +30,6 @@ function createX402Server() {
   const facilitatorClient = new HTTPFacilitatorClient({
     url: facilitatorUrl,
   });
-  // Patch initialize() to be non-fatal when facilitator is unreachable (CI/e2e builds).
-  // withX402 calls initialize() at server startup; without this it throws an
-  // unhandledRejection that kills the Next.js process when the facilitator isn't running.
-  const originalGetSupported = facilitatorClient.getSupported.bind(facilitatorClient);
-  facilitatorClient.getSupported = async () => {
-    try {
-      return await originalGetSupported();
-    } catch (err) {
-      console.warn('[x402] Facilitator unreachable, running in degraded mode:', err);
-      // Return empty supported response — x402 routes will return 402 on every request
-      return { kinds: [], extensions: [], signers: {} };
-    }
-  };
 
   const evmScheme = new ExactEvmScheme();
   evmScheme.registerMoneyParser(async (amount: number, network: string) => {
@@ -58,8 +45,22 @@ function createX402Server() {
     return null;
   });
 
-  return new x402ResourceServer(facilitatorClient)
+  const server = new x402ResourceServer(facilitatorClient)
     .register(UNICHAIN_SEPOLIA_CAIP2, evmScheme);
+
+  // Patch initialize() to never throw — withX402 calls this as a floating Promise
+  // at server startup. If the facilitator is unreachable (CI/e2e) the unhandled
+  // rejection kills the Next.js process. In degraded mode x402 routes return 402.
+  const originalInit = server.initialize.bind(server);
+  server.initialize = async () => {
+    try {
+      await originalInit();
+    } catch (err) {
+      console.warn('[x402] Facilitator unreachable, running in degraded mode (x402 routes will return 402):', err);
+    }
+  };
+
+  return server;
 }
 
 export function getX402Server() {
