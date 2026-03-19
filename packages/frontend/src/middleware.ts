@@ -102,8 +102,8 @@ export function middleware(request: NextRequest) {
   // Rate limiting for API routes
   const rule = getRateRule(pathname);
   if (rule) {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
-      || request.headers.get('x-real-ip')
+    const ip = request.headers.get('x-real-ip')
+      || request.headers.get('x-forwarded-for')?.split(',')[0].trim()
       || '127.0.0.1';
 
     if (!rateLimit(ip, rule.prefix, rule.maxRequests, rule.windowMs)) {
