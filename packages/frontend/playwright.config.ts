@@ -31,6 +31,8 @@ webServers.push({
     NEXT_PUBLIC_PRAYER_BURN_ADDRESS: '0x38C7AD96C2f5c90BE692605a7a7B633071122c72',
     JWT_SECRET: 'bd1ae6f8e93eb9f21b4b4ccc502a81eacf7340ba4ec8835e',
     FACILITATOR_URL: 'http://localhost:4402',
+    E2E_BASE_URL: baseURL,
+    REDIS_URL: 'redis://127.0.0.1:6379',
   },
 });
 
