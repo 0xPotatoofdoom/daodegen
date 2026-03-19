@@ -46,7 +46,7 @@ jobs:
           cd packages/contracts
           slither . --config-file slither.config.json \
             --exclude-informational --exclude-low \
-            --fail-on medium
+            --fail-medium
 
   frontend:
     runs-on: ubuntu-latest
