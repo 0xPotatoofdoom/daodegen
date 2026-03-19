@@ -11,6 +11,7 @@ import { verses } from "@/lib/verses";
 import { recordPrayer, getSummary, SentimentTag } from "@/lib/congregation";
 import { generateFallbackSermon } from "@/lib/fallback";
 import { fetchPrayerByTxHash } from "@/lib/ponder";
+import { verifyBurnTx, isBurnTxUsed, markBurnTxUsed } from "@/lib/verify-burn";
 import { reqLogger } from "@/lib/logger";
 
 const SERMON_COMMITMENT_ABI = parseAbi([
@@ -105,6 +106,20 @@ export async function POST(req: NextRequest) {
   if (!prayerType || !VALID_PRAYER_TYPES.includes(prayerType)) {
     return apiError(400, Errors.SERMON_INVALID_PRAYER, { valid: VALID_PRAYER_TYPES }, undefined, traceId);
   }
+  // --- Burn tx replay check ---
+  if (await isBurnTxUsed(prayerTx)) {
+    return apiError(409, Errors.BURN_TX_ALREADY_USED, undefined, undefined, traceId);
+  }
+
+  // --- On-chain burn verification ---
+  const burnResult = await verifyBurnTx(
+    prayerTx as `0x${string}`,
+    senderAddress as `0x${string}`
+  );
+  if (!burnResult.ok) {
+    return apiError(400, Errors[burnResult.code as keyof typeof Errors], undefined, undefined, traceId);
+  }
+
   const rawBurn = body.burn_amount ?? "0";
   const burnAmount = /^\d+(\.\d+)?$/.test(rawBurn) ? rawBurn : "0";
   const message = body.message ?? "";
@@ -131,6 +146,7 @@ export async function POST(req: NextRequest) {
     sermon = generateFallbackSermon(safeMessage, verses);
   }
   await setWalletCooldown(senderAddress);
+  await markBurnTxUsed(prayerTx);
   recordPrayer(senderAddress, sermon.sentiment_tag as SentimentTag);
 
   // ---Get Prayer ID from Ponder indexer---
