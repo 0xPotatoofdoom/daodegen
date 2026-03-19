@@ -81,10 +81,17 @@ export async function verifyAgentIdentity(params: VerifySessionParams): Promise<
       return { success: false, error: `Chain ID not allowed: ${siweMessage.chainId}` };
     }
 
+    // Normalise signature — some clients omit the 0x prefix, causing a
+    // BytesLike parse error deep in the SIWE library that pollutes logs
+    // even though the outer try/catch returns a clean 401.
+    const sig = params.signature.startsWith('0x')
+      ? params.signature
+      : '0x' + params.signature;
+
     let verifyResult;
     try {
         verifyResult = await siweMessage.verify({ 
-            signature: params.signature,
+            signature: sig,
             nonce: siweMessage.nonce 
         });
     } catch {
