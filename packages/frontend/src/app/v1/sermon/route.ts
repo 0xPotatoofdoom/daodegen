@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
 import { createWalletClient, createPublicClient, http, keccak256, toHex, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { env } from "@/lib/env";
 import { chainConfig } from "@/lib/chain-config";
 import { apiError, Errors, getTraceId } from "@/lib/errors";
+import { verifyJwt, walletMatchesJwt } from "@/lib/jwt";
 import { llm, SermonRequest, SermonResponse, PrayerType } from "@/lib/llm";
 import { sanitizeInput } from "@/lib/llm";
 import { verses } from "@/lib/verses";
@@ -23,7 +23,6 @@ const PASTOR_PRIVATE_KEY = process.env.PASTOR_PRIVATE_KEY as
   | `0x${string}`
   | undefined;
 
-const SECRET_KEY = new TextEncoder().encode(env.JWT_SECRET);
 const WALLET_COOLDOWN_MS = 60_000;
 const WALLET_COOLDOWN_S = Math.ceil(WALLET_COOLDOWN_MS / 1000);
 
@@ -75,9 +74,8 @@ export async function POST(req: NextRequest) {
     return apiError(401, Errors.AUTH_MISSING_TOKEN, undefined, undefined, traceId);
   }
   const token = authHeader.split(" ")[1];
-  try {
-    await jwtVerify(token, SECRET_KEY);
-  } catch {
+  const jwtPayload = await verifyJwt(token);
+  if (!jwtPayload) {
     return apiError(401, Errors.AUTH_INVALID_TOKEN, undefined, undefined, traceId);
   }
   let body: {
@@ -96,6 +94,10 @@ export async function POST(req: NextRequest) {
   const senderAddress = body.sender?.toLowerCase();
   if (!senderAddress || !/^0x[a-f0-9]{40}$/.test(senderAddress)) {
     return apiError(400, Errors.SERMON_INVALID_SENDER, undefined, undefined, traceId);
+  }
+  // Issue #312: verify sender matches the wallet bound in the JWT
+  if (!walletMatchesJwt(jwtPayload, senderAddress)) {
+    return apiError(403, Errors.AUTH_WALLET_MISMATCH, undefined, undefined, traceId);
   }
   const prayerTx = body.prayer_tx?.toLowerCase();
   if (!prayerTx || !/^0x[a-f0-9]{64}$/.test(prayerTx)) {

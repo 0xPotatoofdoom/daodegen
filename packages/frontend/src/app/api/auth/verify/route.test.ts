@@ -31,6 +31,15 @@ vi.mock('@/lib/env', () => ({
   },
 }));
 
+vi.mock('viem', async () => {
+  const actual = await vi.importActual<typeof import('viem')>('viem');
+  return {
+    ...actual,
+    // In tests, getAddress just returns the input (real checksumming is tested elsewhere)
+    getAddress: (addr: string) => addr,
+  };
+});
+
 // Use vi.hoisted() to define mocks that can be referenced inside vi.mock factories
 const {
   mockSign,
@@ -211,6 +220,7 @@ describe('POST /api/auth/verify', () => {
 
     expect(mockConstructorSpy).toHaveBeenCalledWith({
       sub: '0xDeadBeef',
+      walletAddress: '0xDeadBeef',
       agentId: 'agent-7',
     });
     expect(mockSetProtectedHeader).toHaveBeenCalledWith({ alg: 'HS256' });

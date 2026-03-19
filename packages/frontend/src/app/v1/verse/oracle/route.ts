@@ -2,16 +2,13 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
 import { withX402 } from "@x402/next";
-import { jwtVerify } from "jose";
 import { x402Server, PAY_TO, USDC_NETWORK, PRICE_ORACLE } from "@/lib/x402";
 import { verses } from "@/lib/verses";
 import { getVerseById } from "@/lib/verses";
 import { llm, OracleResponse } from "@/lib/llm";
-import { env } from "@/lib/env";
+import { verifyJwt } from "@/lib/jwt";
 import { reqLogger } from "@/lib/logger";
 import { apiError, Errors, getTraceId } from "@/lib/errors";
-
-const SECRET_KEY = new TextEncoder().encode(env.JWT_SECRET);
 
 const handler = async (req: NextRequest) => {
   const traceId = getTraceId(req);
@@ -24,9 +21,8 @@ const handler = async (req: NextRequest) => {
   }
 
   const token = authHeader.split(" ")[1];
-  try {
-    await jwtVerify(token, SECRET_KEY);
-  } catch {
+  const jwtPayload = await verifyJwt(token);
+  if (!jwtPayload) {
     return apiError(401, Errors.AUTH_INVALID_TOKEN, undefined, undefined, traceId);
   }
 

@@ -28,6 +28,10 @@ export const Errors = {
     code: "AUTH_INVALID_TOKEN",
     message: "JWT token is invalid or expired",
   },
+  AUTH_WALLET_MISMATCH: {
+    code: "AUTH_WALLET_MISMATCH",
+    message: "JWT wallet address does not match the request sender",
+  },
   AUTH_NOT_AGENT: {
     code: "AUTH_NOT_AGENT",
     message: "Address is not a registered Agent (EIP-8004)",
