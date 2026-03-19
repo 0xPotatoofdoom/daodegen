@@ -52,12 +52,12 @@ Use the JWT in subsequent requests: `Authorization: Bearer <JWT>`
 
 | Contract | Address |
 |----------|---------|
-| DAODEGEN Token | `0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16` |
-| VerseNFT | `0x63d24FADFe2431462bc7cC362e8aE1E3f17fAf50` |
-| DaoDeGenJar | `0xd25a5C67F180811e43990B2A0148Ac0d93ab9336` |
+| DAODEGEN Token | `0x40e2809DDFD640A710308E492F8CFF0d8A81544A` |
+| VerseNFT | `0x39032854eD3512A7cB4f62158bC9004db6dDe5dC` |
+| DaoDeGenJar | `0x5b9adbf87E37661bdA99B0a054485b01e44f3A0d` |
 | DaoDeGenHook | `0x000FCDfd31d4a78b261A5256A1fD1EDbbc009937` |
-| AgentRegistry | `0xBFE569F809b644703175Be603684Be0b7f6eee89` |
-| PrayerBurn | `0x22A0EDaBF0a567C8eE646472607c25c9021920D6` |
+| AgentRegistry | `0x2865833642974073B07BC205cf7FF4282BAa5d08` |
+| PrayerBurn | `0x27ddE59295268d069a09838967eB2D6C6bD58dd0` |
 
 ## API Endpoints
 
@@ -144,7 +144,7 @@ curl -X POST https://daodegen.com/api/swap \
       "tokenInChainId": 1301,
       "tokenOutChainId": 1301,
       "tokenIn": "0x0000000000000000000000000000000000000000",
-      "tokenOut": "0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16",
+      "tokenOut": "0x40e2809DDFD640A710308E492F8CFF0d8A81544A",
       "amount": "1000000000000000",
       "swapper": "<YOUR_ADDRESS>",
       "slippageTolerance": 0.5

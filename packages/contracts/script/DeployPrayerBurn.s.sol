@@ -19,9 +19,9 @@ contract DeployPrayerBurn is Script {
         uint256 cooldownPeriod;
 
         if (chainId == 1301) {
-            // Unichain Sepolia
-            token = 0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16;
-            jar = 0xd25a5C67F180811e43990B2A0148Ac0d93ab9336;
+            // Unichain Sepolia (v4 deploy 2026-03-19)
+            token = 0x40e2809DDFD640A710308E492F8CFF0d8A81544A;
+            jar = 0x5b9adbf87E37661bdA99B0a054485b01e44f3A0d;
             minimumBurn = 100e18;       // 100 DAODEGEN
             cooldownPeriod = 60;        // 60 seconds
         } else if (chainId == 130) {

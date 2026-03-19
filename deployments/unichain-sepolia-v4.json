@@ -1,0 +1,25 @@
+{
+  "chainId": 1301,
+  "network": "unichain-sepolia",
+  "deployedAt": "2026-03-19",
+  "deployedBy": "0x3D0e10329c864A7422761af058f909267a776029",
+  "note": "Full redeploy with all audit fixes applied. VerseNFT: excess refund + reentrancy guard. DaoDeGenJar: burnAmount timelock. DaoDeGenHook: two-step ownership + rescueETH + SafeERC20. SermonCommitment: two-step ownership + nonce in commitment ID + clean escrow semantics. PrayerBurn: onlyOwner on approveJar + _tryRelease Currency fix.",
+  "contracts": {
+    "DaoDeGenToken": "0x40e2809DDFD640A710308E492F8CFF0d8A81544A",
+    "VerseNFT": "0x39032854eD3512A7cB4f62158bC9004db6dDe5dC",
+    "DaoDeGenJar": "0x5b9adbf87E37661bdA99B0a054485b01e44f3A0d",
+    "DaoDeGenHook": "0x37771fb8E618A2253C10586DDa8A894A39Dd8e6f",
+    "AgentRegistry": "0x2865833642974073B07BC205cf7FF4282BAa5d08",
+    "PrayerBurn": "0x27ddE59295268d069a09838967eB2D6C6bD58dd0",
+    "SermonCommitment": "0x2896b53c8eE213473234a23a47ff2171338A2b59"
+  },
+  "setup": {
+    "PrayerBurn_daodegen_funded": "1000 DAODEGEN",
+    "PrayerBurn_approveJar": "max allowance set",
+    "PrayerBurn_releaseThreshold": "100000000000000 (0.0001 ETH)",
+    "PrayerBurn_sermonCommitment": "0x2896b53c8eE213473234a23a47ff2171338A2b59",
+    "DaoDeGenJar_burnAmount": "1000 DAODEGEN",
+    "initialHolder": "0x3D0e10329c864A7422761af058f909267a776029"
+  },
+  "previousDeployment": "unichain-sepolia-v3.json"
+}
