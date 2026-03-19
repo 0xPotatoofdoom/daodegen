@@ -39,3 +39,6 @@ soul.md
 scripts/ipfs/
 scripts/ipfs-migration.js
 ipfs-hashes.json
+agent_log.json
+scripts/mvp-prayer-results/
+scripts/daodegen_vps_setup.sh
