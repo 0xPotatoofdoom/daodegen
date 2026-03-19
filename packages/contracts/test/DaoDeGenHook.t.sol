@@ -13,6 +13,7 @@ import {BeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {Currency, CurrencyLibrary} from "v4-core/types/Currency.sol";
 import {ModifyLiquidityParams, SwapParams} from "v4-core/types/PoolOperation.sol";
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title DaoDeGenHookTest
 /// @notice Tests for DaoDeGenHook including timelock pause behavior (Issue #257)
@@ -36,7 +37,7 @@ contract DaoDeGenHookTest is Test {
     function test_Hook_AfterSwap_RoutesFees() public {
         PoolKey memory key = PoolKey({
             currency0: Currency.wrap(address(0)),
-            currency1: Currency.wrap(makeAddr("token1")),
+            currency1: Currency.wrap(address(token)),
             fee: 3000,
             tickSpacing: 60,
             hooks: IHooks(address(hook))
@@ -56,6 +57,7 @@ contract DaoDeGenHookTest is Test {
             abi.encodeWithSelector(IPoolManager.take.selector),
             abi.encode()
         );
+        token.transfer(address(hook), expectedFee);
 
         vm.prank(address(manager));
         (bytes4 selector, int128 fee) = hook.afterSwap(address(0), key, params, delta, "");
@@ -214,9 +216,10 @@ contract DaoDeGenHookTest is Test {
     }
 
     function test_FullLifecycle_PauseTimelockUnpause() public {
+        uint256 expectedFee = 20 ether;
         PoolKey memory key = PoolKey({
             currency0: Currency.wrap(address(0)),
-            currency1: Currency.wrap(makeAddr("token1")),
+            currency1: Currency.wrap(address(token)),
             fee: 3000,
             tickSpacing: 60,
             hooks: IHooks(address(hook))
@@ -237,6 +240,7 @@ contract DaoDeGenHookTest is Test {
         );
 
         // 1. Swaps work initially
+        token.transfer(address(hook), expectedFee);
         vm.prank(address(manager));
         hook.afterSwap(address(0), key, params, delta, "");
 
@@ -258,6 +262,7 @@ contract DaoDeGenHookTest is Test {
         vm.warp(block.timestamp + 2 days);
         hook.executePause();
 
+        token.transfer(address(hook), expectedFee);
         vm.prank(address(manager));
         (bytes4 selector,) = hook.afterSwap(address(0), key, params, delta, "");
         assertEq(selector, IHooks.afterSwap.selector);
@@ -478,6 +483,88 @@ contract DaoDeGenHookTest is Test {
         (bool ok,) = address(hook).call{value: 1 ether}("");
         assertTrue(ok);
         assertEq(address(hook).balance, 1 ether);
+    }
+
+    // -------------------------------------------------------------------------
+    // rescueERC20 tests (Issue #343)
+    // -------------------------------------------------------------------------
+
+    function test_RescueERC20_OwnerCanRecover() public {
+        // Send some tokens to the hook
+        uint256 amount = 1000 ether;
+        token.transfer(address(hook), amount);
+
+        address recipient = makeAddr("recipient");
+
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.ERC20Rescued(address(token), recipient, amount);
+        hook.rescueERC20(address(token), recipient, amount);
+
+        assertEq(token.balanceOf(address(hook)), 0);
+        assertEq(token.balanceOf(recipient), amount);
+    }
+
+    function test_RescueERC20_RevertsForNonOwner() public {
+        token.transfer(address(hook), 100 ether);
+        address nonOwner = makeAddr("nonOwner");
+
+        vm.prank(nonOwner);
+        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
+        hook.rescueERC20(address(token), makeAddr("recipient"), 100 ether);
+    }
+
+    function test_RescueERC20_RevertsForZeroAddress() public {
+        token.transfer(address(hook), 100 ether);
+        vm.expectRevert(DaoDeGenHook.InvalidAddress.selector);
+        hook.rescueERC20(address(token), address(0), 100 ether);
+    }
+
+    function test_RescueERC20_PartialAmount() public {
+        token.transfer(address(hook), 1000 ether);
+        address recipient = makeAddr("recipient");
+
+        hook.rescueERC20(address(token), recipient, 400 ether);
+
+        assertEq(token.balanceOf(address(hook)), 600 ether);
+        assertEq(token.balanceOf(recipient), 400 ether);
+    }
+
+    // -------------------------------------------------------------------------
+    // SafeERC20 transfer in afterSwap (Issue #343)
+    // -------------------------------------------------------------------------
+
+    function test_AfterSwap_ERC20FeeUsesSafeTransfer() public {
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(address(token)),
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: IHooks(address(hook))
+        });
+
+        SwapParams memory params = SwapParams({
+            zeroForOne: true,
+            amountSpecified: -1 ether,
+            sqrtPriceLimitX96: 0
+        });
+
+        BalanceDelta delta = toBalanceDelta(-1 ether, 2000 ether);
+        uint256 expectedFee = 20 ether;
+
+        // Mock manager.take() and fund the hook with tokens for forwarding
+        vm.mockCall(
+            address(manager),
+            abi.encodeWithSelector(IPoolManager.take.selector),
+            abi.encode()
+        );
+        token.transfer(address(hook), expectedFee);
+
+        vm.prank(address(manager));
+        (bytes4 selector, int128 feeReturned) = hook.afterSwap(address(0), key, params, delta, "");
+
+        assertEq(selector, IHooks.afterSwap.selector);
+        assertEq(uint128(feeReturned), expectedFee);
+        assertEq(token.balanceOf(address(jar)), expectedFee);
     }
 
     function test_AfterSwap_RevertsForNonManager() public {

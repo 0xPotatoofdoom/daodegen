@@ -10,6 +10,8 @@ import {BeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {Currency, CurrencyLibrary} from "v4-core/types/Currency.sol";
 import {SafeCast} from "v4-core/libraries/SafeCast.sol";
 import {IUnlockCallback} from "v4-core/interfaces/callback/IUnlockCallback.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title DaoDeGenHook
 /// @notice V4 afterSwap hook — routes 1% of swap output to DaoDeGenJar immediately.
@@ -26,6 +28,7 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
     using SafeCast for uint256;
     using SafeCast for int128;
     using CurrencyLibrary for Currency;
+    using SafeERC20 for IERC20;
 
     IPoolManager public immutable manager;
     address public immutable jar;
@@ -58,6 +61,7 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
     event HookPauseChanged(bool paused);
     event FeesAccrued(Currency indexed currency, uint256 amount);
     event ETHRescued(address indexed to, uint256 amount);
+    event ERC20Rescued(address indexed token, address indexed to, uint256 amount);
 
     modifier whenNotPaused() {
         if (paused) revert HookPaused();
@@ -212,7 +216,7 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
             (bool ok,) = jar.call{value: feeAmount}("");
             require(ok, "ETH to jar failed");
         } else {
-            feeCurrency.transfer(jar, feeAmount);
+            IERC20(Currency.unwrap(feeCurrency)).safeTransfer(jar, feeAmount);
         }
 
         emit FeesAccrued(feeCurrency, feeAmount);
@@ -249,6 +253,17 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
         (bool ok,) = to.call{value: balance}("");
         require(ok, "ETH transfer failed");
         emit ETHRescued(to, balance);
+    }
+
+    /// @notice Recover ERC20 tokens accidentally sent to this contract.
+    /// @param token Address of the ERC20 token.
+    /// @param to Address to send the tokens to.
+    /// @param amount Amount of tokens to transfer.
+    function rescueERC20(address token, address to, uint256 amount) external {
+        if (msg.sender != owner) revert NotOwner();
+        if (to == address(0)) revert InvalidAddress();
+        IERC20(token).safeTransfer(to, amount);
+        emit ERC20Rescued(token, to, amount);
     }
 
     receive() external payable {}
