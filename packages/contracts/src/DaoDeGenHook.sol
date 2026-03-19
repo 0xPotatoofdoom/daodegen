@@ -53,6 +53,7 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
     event PauseScheduled(bool paused, uint256 executeAfter);
     event HookPauseChanged(bool paused);
     event FeesAccrued(Currency indexed currency, uint256 amount);
+    event ETHRescued(address indexed to, uint256 amount);
 
     modifier whenNotPaused() {
         if (paused) revert HookPaused();
@@ -209,6 +210,17 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
     function unlockCallback(bytes calldata) external override returns (bytes memory) {
         if (msg.sender != address(manager)) revert OnlyPoolManager();
         return "";
+    }
+
+    /// @notice Recover ETH accidentally sent to this contract.
+    /// @param to Address to send the ETH to.
+    function rescueETH(address to) external {
+        if (msg.sender != owner) revert NotOwner();
+        if (to == address(0)) revert InvalidAddress();
+        uint256 balance = address(this).balance;
+        (bool ok,) = to.call{value: balance}("");
+        require(ok, "ETH transfer failed");
+        emit ETHRescued(to, balance);
     }
 
     receive() external payable {}

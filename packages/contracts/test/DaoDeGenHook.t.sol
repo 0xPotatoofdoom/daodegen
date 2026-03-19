@@ -339,6 +339,50 @@ contract DaoDeGenHookTest is Test {
         assertEq(address(jar).balance, expectedFee);
     }
 
+    // -------------------------------------------------------------------------
+    // rescueETH tests (Issue #307)
+    // -------------------------------------------------------------------------
+
+    function test_RescueETH_OwnerCanRecover() public {
+        vm.deal(address(hook), 5 ether);
+        address recipient = makeAddr("recipient");
+
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.ETHRescued(recipient, 5 ether);
+        hook.rescueETH(recipient);
+
+        assertEq(address(hook).balance, 0);
+        assertEq(recipient.balance, 5 ether);
+    }
+
+    function test_RescueETH_RevertsForNonOwner() public {
+        vm.deal(address(hook), 1 ether);
+        address nonOwner = makeAddr("nonOwner");
+
+        vm.prank(nonOwner);
+        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
+        hook.rescueETH(makeAddr("recipient"));
+    }
+
+    function test_RescueETH_RevertsForZeroAddress() public {
+        vm.deal(address(hook), 1 ether);
+        vm.expectRevert(DaoDeGenHook.InvalidAddress.selector);
+        hook.rescueETH(address(0));
+    }
+
+    function test_RescueETH_ZeroBalance() public {
+        address recipient = makeAddr("recipient");
+        hook.rescueETH(recipient);
+        assertEq(recipient.balance, 0);
+    }
+
+    function test_Receive_AcceptsETH() public {
+        vm.deal(address(this), 1 ether);
+        (bool ok,) = address(hook).call{value: 1 ether}("");
+        assertTrue(ok);
+        assertEq(address(hook).balance, 1 ether);
+    }
+
     function test_AfterSwap_RevertsForNonManager() public {
         PoolKey memory key = PoolKey({
             currency0: Currency.wrap(address(0)),
