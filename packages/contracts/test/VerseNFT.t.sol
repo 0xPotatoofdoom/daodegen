@@ -440,6 +440,42 @@ contract VerseNFTTest is Test {
         assertEq(verseNFT.nextMintableTimestamp(user1), block.timestamp);
     }
 
+    // ---- Mint Refund Tests ----
+
+    function testMintRefundsExcess() public {
+        vm.deal(user1, 10 ether);
+        uint256 price = verseNFT.mintPrice();
+        uint256 overpay = price * 2;
+
+        uint256 balanceBefore = user1.balance;
+
+        vm.prank(user1);
+        vm.expectEmit(true, false, false, true, address(verseNFT));
+        emit VerseNFT.MintRefunded(user1, overpay - price);
+        verseNFT.mint{value: overpay}();
+
+        // User paid only the exact price (refund returned the excess)
+        assertEq(balanceBefore - user1.balance, price);
+        // mintRevenue tracks only the price, not the overpayment
+        assertEq(verseNFT.mintRevenue(), price);
+    }
+
+    function testMintExactPaymentNoRefund() public {
+        vm.deal(user1, 10 ether);
+        uint256 price = verseNFT.mintPrice();
+
+        uint256 balanceBefore = user1.balance;
+
+        vm.prank(user1);
+        verseNFT.mint{value: price}();
+
+        // User paid exactly the price — no refund
+        assertEq(balanceBefore - user1.balance, price);
+        assertEq(verseNFT.mintRevenue(), price);
+        // Contract holds exactly the price
+        assertEq(address(verseNFT).balance, price);
+    }
+
     function testNextMintableTimestampWithZeroCooldown() public {
         verseNFT.setMintCooldown(0);
         assertEq(verseNFT.nextMintableTimestamp(user1), block.timestamp);

@@ -34,6 +34,7 @@ contract VerseNFT is ERC721Enumerable, Ownable, Pausable {
     event BaseMintPriceUpdated(uint256 newPrice);
     event PriceIncrementUpdated(uint256 newIncrement);
     event MintCooldownUpdated(uint256 newCooldown);
+    event MintRefunded(address indexed minter, uint256 excess);
 
     constructor(
         string memory _initialBaseURI,
@@ -57,7 +58,8 @@ contract VerseNFT is ERC721Enumerable, Ownable, Pausable {
         if (mintCooldown > 0 && lastMintTimestamp[msg.sender] > 0 && block.timestamp < lastMintTimestamp[msg.sender] + mintCooldown) {
             revert MintCooldownActive();
         }
-        if (msg.value < mintPrice()) revert InsufficientPayment();
+        uint256 price = mintPrice();
+        if (msg.value < price) revert InsufficientPayment();
 
         while (_nextTokenId <= MAX_SUPPLY && _ownerOf(_nextTokenId) != address(0)) {
             _nextTokenId++;
@@ -66,9 +68,15 @@ contract VerseNFT is ERC721Enumerable, Ownable, Pausable {
         if (_nextTokenId > MAX_SUPPLY) revert MaxSupplyReached();
 
         lastMintTimestamp[msg.sender] = block.timestamp;
-        mintRevenue += msg.value;
+        mintRevenue += price;
         _safeMint(msg.sender, _nextTokenId);
         _nextTokenId++;
+
+        uint256 excess = msg.value - price;
+        if (excess > 0) {
+            emit MintRefunded(msg.sender, excess);
+            Address.sendValue(payable(msg.sender), excess);
+        }
     }
 
     /// @notice Owner can mint specific verse IDs
