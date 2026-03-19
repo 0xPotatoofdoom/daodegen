@@ -51,9 +51,14 @@ export const config = getDefaultConfig({
   projectId: (() => {
     const id = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID;
     if (!id || id === 'demo-project-id') {
-      console.warn('[wagmi] NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID is not set — wallet connections may fail in production');
+      if (process.env.NODE_ENV === 'production') {
+        // Fail loudly in production — silent fallback hides misconfiguration
+        throw new Error('[wagmi] NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID is required in production. Set it in your environment.');
+      }
+      console.warn('[wagmi] NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID is not set — WalletConnect connections will fail');
+      return 'demo-project-id';
     }
-    return id || 'demo-project-id';
+    return id;
   })(),
   chains: [unichain, unichainSepolia],
   transports: {

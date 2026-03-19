@@ -8,7 +8,14 @@ const MAX_CONTEXT_LENGTH = 500;
 const MAX_STATE_LENGTH = 500;
 
 export function sanitizeInput(input: string, maxLength: number): string {
-  const cleaned = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  // Remove control characters
+  let cleaned = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  // Neutralise prompt injection: strip delimiter sequences that could break
+  // out of the ---BEGIN PRAYER--- / ---END PRAYER--- blocks in LLM prompts.
+  // Replace any run of dashes (3+) to prevent crafted delimiters.
+  cleaned = cleaned.replace(/---+/g, '--');
+  // Strip XML/system-tag patterns used by some models
+  cleaned = cleaned.replace(/<\/?(?:system|prompt|instruction|context|human|assistant)\b[^>]*>/gi, '');
   return cleaned.slice(0, maxLength);
 }
 

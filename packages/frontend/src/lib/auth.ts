@@ -63,8 +63,10 @@ export async function verifyAgentIdentity(params: VerifySessionParams): Promise<
   try {
     const siweMessage = new SiweMessage(params.message);
     
-    // Validate Nonce
-    const expiry = activeNonces.get(siweMessage.nonce);
+    // Validate Nonce — use getAsync to recover nonces from Redis after cold restart
+    const expiry = typeof (activeNonces as { getAsync?: (n: string) => Promise<number | undefined> }).getAsync === 'function'
+      ? await (activeNonces as { getAsync: (n: string) => Promise<number | undefined> }).getAsync(siweMessage.nonce)
+      : activeNonces.get(siweMessage.nonce);
     if (!expiry || expiry < Date.now()) {
         return { success: false, error: 'Invalid or expired nonce' };
     }

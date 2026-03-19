@@ -59,7 +59,8 @@ interface RateRule {
 }
 
 // In E2E test environments, relax rate limits to avoid flaky tests.
-const multiplier = process.env.E2E_BASE_URL ? 10 : 1;
+// Blocked in production to prevent accidental misconfiguration.
+const multiplier = (process.env.E2E_BASE_URL && process.env.NODE_ENV !== 'production') ? 10 : 1;
 
 const RATE_RULES: RateRule[] = [
   // Auth endpoints -- tight limits, no reason to hammer these
@@ -146,7 +147,7 @@ export function middleware(request: NextRequest) {
   response.headers.set(
     'Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com; " +
+    "script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com; " +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: https:; " +
     "font-src 'self' data:; " +

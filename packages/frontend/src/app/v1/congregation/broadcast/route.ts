@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyMessage } from "viem";
 import { addBroadcast } from "@/lib/broadcasts";
 import { reqLogger } from "@/lib/logger";
 import { apiError, Errors, getTraceId } from "@/lib/errors";
@@ -49,8 +50,24 @@ export async function POST(req: NextRequest) {
     return apiError(400, Errors.SERMON_INVALID_SENDER, { field: "agentAddress" }, undefined, traceId);
   }
 
-  if (typeof signature !== "string" || signature.length === 0) {
-    return apiError(400, Errors.INVALID_BODY, { field: "signature", expected: "non-empty string" }, undefined, traceId);
+  if (typeof signature !== "string" || !/^0x[0-9a-fA-F]{130}$/.test(signature)) {
+    return apiError(400, Errors.INVALID_BODY, { field: "signature", expected: "0x-prefixed 65-byte EIP-191 signature" }, undefined, traceId);
+  }
+
+  // --- Verify EIP-191 signature ---
+  // The agent must sign the canonical message: "<message>|<verseNumber>|<agentAddress>"
+  const signedPayload = `${message}|${verseNumber}|${agentAddress.toLowerCase()}`;
+  try {
+    const valid = await verifyMessage({
+      address: agentAddress as `0x${string}`,
+      message: signedPayload,
+      signature: signature as `0x${string}`,
+    });
+    if (!valid) {
+      return apiError(401, Errors.AUTH_INVALID_TOKEN, { reason: "Signature does not match agentAddress" }, undefined, traceId);
+    }
+  } catch {
+    return apiError(401, Errors.AUTH_INVALID_TOKEN, { reason: "Invalid signature" }, undefined, traceId);
   }
 
   // --- Store ---

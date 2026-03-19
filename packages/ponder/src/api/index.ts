@@ -5,6 +5,39 @@ import { and, count, desc, eq, sum, graphql, replaceBigInts } from "ponder";
 
 const app = new Hono();
 
+// ── Simple in-process rate limiter (100 req/min per IP) ──────────────────────
+// Ponder runs as a single Node process; in-memory is fine here.
+// GraphQL gets a tighter limit (20/min) to prevent expensive query abuse.
+const _buckets = new Map<string, { ts: number[] }>();
+function rateLimit(ip: string, maxPerMin: number): boolean {
+  const now = Date.now();
+  const cutoff = now - 60_000;
+  let b = _buckets.get(ip);
+  if (!b) { b = { ts: [] }; _buckets.set(ip, b); }
+  b.ts = b.ts.filter(t => t > cutoff);
+  if (b.ts.length >= maxPerMin) return false;
+  b.ts.push(now);
+  return true;
+}
+// Evict stale entries every 5 min
+setInterval(() => {
+  const cutoff = Date.now() - 60_000;
+  for (const [k, b] of _buckets) {
+    if (b.ts.every(t => t <= cutoff)) _buckets.delete(k);
+  }
+}, 300_000);
+
+app.use("*", async (c, next) => {
+  const ip = c.req.header("x-forwarded-for")?.split(",")[0].trim()
+    || c.req.header("x-real-ip")
+    || "unknown";
+  const limit = c.req.path.startsWith("/graphql") ? 20 : 100;
+  if (!rateLimit(ip, limit)) {
+    return c.json({ error: "Too many requests" }, 429);
+  }
+  return next();
+});
+
 // GraphQL endpoint (auto-generated from schema)
 app.use("/graphql", graphql({ db, schema }));
 

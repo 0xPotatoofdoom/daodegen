@@ -56,15 +56,36 @@ export class RedisNonceStore implements NonceStore {
     return this.cache.get(nonce);
   }
 
+  async getAsync(nonce: string): Promise<number | undefined> {
+    // Check cache first; fall back to Redis for post-restart recovery
+    const cached = this.cache.get(nonce);
+    if (cached !== undefined) return cached;
+    try {
+      const val = await this.redis.get(this.prefix + nonce);
+      if (val) {
+        const expiry = Number(val);
+        this.cache.set(nonce, expiry); // warm the cache
+        return expiry;
+      }
+    } catch (err) {
+      console.error("[redis] NonceStore.getAsync failed:", err instanceof Error ? err.message : err);
+    }
+    return undefined;
+  }
+
   set(nonce: string, expiry: number): void {
     this.cache.set(nonce, expiry);
     const ttl = Math.max(1, Math.ceil((expiry - Date.now()) / 1000));
-    this.redis.set(this.prefix + nonce, String(expiry), "EX", ttl).catch(() => {});
+    this.redis.set(this.prefix + nonce, String(expiry), "EX", ttl).catch((err) => {
+      console.error("[redis] NonceStore.set failed:", err instanceof Error ? err.message : err);
+    });
   }
 
   delete(nonce: string): void {
     this.cache.delete(nonce);
-    this.redis.del(this.prefix + nonce).catch(() => {});
+    this.redis.del(this.prefix + nonce).catch((err) => {
+      console.error("[redis] NonceStore.delete failed:", err instanceof Error ? err.message : err);
+    });
   }
 
   size(): number {
@@ -97,12 +118,16 @@ export class RedisRateLimitStore implements RateLimitStore {
     this.cache.set(key, bucket);
     this.redis
       .set(this.prefix + key, JSON.stringify(bucket), "EX", this.ttlSeconds)
-      .catch(() => {});
+      .catch((err) => {
+        console.error("[redis] RateLimitStore.set failed:", err instanceof Error ? err.message : err);
+      });
   }
 
   delete(key: string): void {
     this.cache.delete(key);
-    this.redis.del(this.prefix + key).catch(() => {});
+    this.redis.del(this.prefix + key).catch((err) => {
+      console.error("[redis] RateLimitStore.delete failed:", err instanceof Error ? err.message : err);
+    });
   }
 
   entries(): Iterable<[string, RateBucket]> {
@@ -147,13 +172,17 @@ export class RedisCongregationStore implements CongregationStore {
     this.redis
       .rpush(CONGREGATION_KEY, JSON.stringify(record))
       .then(() => this.redis.ltrim(CONGREGATION_KEY, -MAX_CONGREGATION_SIZE, -1))
-      .catch(() => {});
+      .catch((err) => {
+        console.error("[redis] CongregationStore.push failed:", err instanceof Error ? err.message : err);
+      });
   }
 
   shift(): PrayerRecord | undefined {
     const record = this.records.shift();
     if (record) {
-      this.redis.lpop(CONGREGATION_KEY).catch(() => {});
+      this.redis.lpop(CONGREGATION_KEY).catch((err) => {
+        console.error("[redis] CongregationStore.shift failed:", err instanceof Error ? err.message : err);
+      });
     }
     return record;
   }

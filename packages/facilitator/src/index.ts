@@ -201,7 +201,10 @@ async function isRateLimited(ip: string): Promise<boolean> {
 async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   const method = req.method?.toUpperCase();
   const url = req.url;
-  const ip = req.socket.remoteAddress || "unknown";
+  const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim()
+    || req.headers['x-real-ip'] as string
+    || req.socket.remoteAddress
+    || "unknown";
   const traceId = getTraceId(req);
 
   if (await isRateLimited(ip)) {
