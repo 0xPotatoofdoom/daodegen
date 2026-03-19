@@ -18,6 +18,14 @@ describe('API Security', () => {
     }
   });
 
+  it('should guard swap proxy with JWT auth (Issue #315)', () => {
+    const swapRoute = path.resolve(__dirname, 'swap/route.ts');
+    const content = fs.readFileSync(swapRoute, 'utf8');
+    expect(content).toContain('jwtVerify');
+    expect(content).toContain('AUTH_MISSING_TOKEN');
+    expect(content).toContain('AUTH_INVALID_TOKEN');
+  });
+
   it('should have a JWT secret configured (Issue #76)', () => {
     process.env.JWT_SECRET = 'test-secret';
     expect(process.env.JWT_SECRET).toBeDefined();
