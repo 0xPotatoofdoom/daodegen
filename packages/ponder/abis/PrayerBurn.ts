@@ -1,5 +1,15 @@
 export const PrayerBurnAbi = [
   {
+    type: "function",
+    name: "pray",
+    inputs: [
+      { name: "amount", type: "uint256" },
+      { name: "message", type: "bytes" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
     type: "event",
     name: "Prayer",
     inputs: [
