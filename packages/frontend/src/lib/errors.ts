@@ -94,6 +94,32 @@ export const Errors = {
     code: "ANON_NULLIFIER_USED",
     message: "This nullifier has already been used",
   },
+
+  // Burn verification
+  BURN_TX_NOT_FOUND: {
+    code: "BURN_TX_NOT_FOUND",
+    message: "Burn transaction not found or has not been mined",
+  },
+  BURN_TX_FAILED: {
+    code: "BURN_TX_FAILED",
+    message: "Burn transaction reverted on-chain",
+  },
+  BURN_TX_WRONG_CONTRACT: {
+    code: "BURN_TX_WRONG_CONTRACT",
+    message: "Transaction was not sent to the PrayerBurn contract",
+  },
+  BURN_TX_NO_EVENT: {
+    code: "BURN_TX_NO_EVENT",
+    message: "Transaction does not contain a PrayerBurned event",
+  },
+  BURN_TX_WRONG_SENDER: {
+    code: "BURN_TX_WRONG_SENDER",
+    message: "Burn transaction sender does not match authenticated wallet",
+  },
+  BURN_TX_ALREADY_USED: {
+    code: "BURN_TX_ALREADY_USED",
+    message: "This burn transaction has already been used for a sermon",
+  },
 } as const;
 
 export type ErrorCode = keyof typeof Errors;
