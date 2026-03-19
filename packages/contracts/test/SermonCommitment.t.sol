@@ -306,6 +306,81 @@ contract SermonCommitmentTest is Test {
         locked.createCommitment(supplicant, BURN_AMOUNT);
     }
 
+    // =========================================================================
+    // Two-step ownership transfer
+    // =========================================================================
+
+    function testTransferOwnership() public {
+        address newOwner = makeAddr("newOwner");
+
+        // Step 1: current owner initiates transfer
+        escrow.transferOwnership(newOwner);
+        assertEq(escrow.pendingOwner(), newOwner);
+        assertEq(escrow.owner(), address(this));
+
+        // Step 2: pending owner accepts
+        vm.prank(newOwner);
+        escrow.acceptOwnership();
+        assertEq(escrow.owner(), newOwner);
+        assertEq(escrow.pendingOwner(), address(0));
+    }
+
+    function testTransferOwnershipOnlyOwner() public {
+        vm.prank(stranger);
+        vm.expectRevert(SermonCommitment.OnlyOwner.selector);
+        escrow.transferOwnership(makeAddr("newOwner"));
+    }
+
+    function testTransferOwnershipZeroAddress() public {
+        vm.expectRevert(SermonCommitment.ZeroAddress.selector);
+        escrow.transferOwnership(address(0));
+    }
+
+    function testAcceptOwnershipOnlyPendingOwner() public {
+        address newOwner = makeAddr("newOwner");
+        escrow.transferOwnership(newOwner);
+
+        vm.prank(stranger);
+        vm.expectRevert(SermonCommitment.OnlyPendingOwner.selector);
+        escrow.acceptOwnership();
+    }
+
+    function testTransferOwnershipEmitsEvents() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.expectEmit(true, true, false, true);
+        emit SermonCommitment.OwnershipTransferInitiated(address(this), newOwner);
+        escrow.transferOwnership(newOwner);
+
+        vm.expectEmit(true, true, false, true);
+        emit SermonCommitment.OwnershipTransferred(address(this), newOwner);
+        vm.prank(newOwner);
+        escrow.acceptOwnership();
+    }
+
+    function testNewOwnerCanAdminister() public {
+        address newOwner = makeAddr("newOwner");
+        escrow.transferOwnership(newOwner);
+        vm.prank(newOwner);
+        escrow.acceptOwnership();
+
+        // New owner can set pastor
+        vm.prank(newOwner);
+        escrow.setPastor(makeAddr("newPastor"));
+        assertEq(escrow.pastor(), makeAddr("newPastor"));
+    }
+
+    function testOldOwnerCannotAdministerAfterTransfer() public {
+        address newOwner = makeAddr("newOwner");
+        escrow.transferOwnership(newOwner);
+        vm.prank(newOwner);
+        escrow.acceptOwnership();
+
+        // Old owner (address(this)) should be rejected
+        vm.expectRevert(SermonCommitment.OnlyOwner.selector);
+        escrow.setPastor(makeAddr("anotherPastor"));
+    }
+
     function testMultipleCommitmentsUniqueSameBlock() public {
         // Two commitments in the same block must produce different IDs (#297)
         vm.prank(prayerBurn);

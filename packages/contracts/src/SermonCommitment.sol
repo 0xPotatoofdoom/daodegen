@@ -15,6 +15,7 @@ contract SermonCommitment {
     // --- State ---
     address public pastor;
     address public owner;
+    address public pendingOwner;
     address public trustedCaller;
     uint256 private _nonce;
 
@@ -35,6 +36,8 @@ contract SermonCommitment {
     event CommitmentFulfilled(bytes32 indexed id, bytes32 wisdomHash, address pastor);
     event CommitmentRefunded(bytes32 indexed id, address supplicant);
     event TrustedCallerUpdated(address indexed oldCaller, address indexed newCaller);
+    event OwnershipTransferInitiated(address indexed currentOwner, address indexed pendingOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // --- Errors ---
     error OnlyPastor();
@@ -45,6 +48,7 @@ contract SermonCommitment {
     error AlreadyRefunded();
     error DeadlineNotReached();
     error ZeroAddress();
+    error OnlyPendingOwner();
 
     modifier onlyTrustedCaller() {
         if (trustedCaller == address(0)) revert OnlyTrustedCaller();
@@ -124,5 +128,21 @@ contract SermonCommitment {
         address old = trustedCaller;
         trustedCaller = _trustedCaller;
         emit TrustedCallerUpdated(old, _trustedCaller);
+    }
+
+    /// @notice Initiate ownership transfer to a new address (two-step).
+    function transferOwnership(address newOwner) external {
+        if (msg.sender != owner) revert OnlyOwner();
+        if (newOwner == address(0)) revert ZeroAddress();
+        pendingOwner = newOwner;
+        emit OwnershipTransferInitiated(owner, newOwner);
+    }
+
+    /// @notice Accept ownership transfer. Must be called by the pending owner.
+    function acceptOwnership() external {
+        if (msg.sender != pendingOwner) revert OnlyPendingOwner();
+        emit OwnershipTransferred(owner, msg.sender);
+        owner = msg.sender;
+        pendingOwner = address(0);
     }
 }
