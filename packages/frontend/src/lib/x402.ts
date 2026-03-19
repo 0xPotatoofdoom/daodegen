@@ -30,6 +30,19 @@ function createX402Server() {
   const facilitatorClient = new HTTPFacilitatorClient({
     url: facilitatorUrl,
   });
+  // Patch initialize() to be non-fatal when facilitator is unreachable (CI/e2e builds).
+  // withX402 calls initialize() at server startup; without this it throws an
+  // unhandledRejection that kills the Next.js process when the facilitator isn't running.
+  const originalGetSupported = facilitatorClient.getSupported.bind(facilitatorClient);
+  facilitatorClient.getSupported = async () => {
+    try {
+      return await originalGetSupported();
+    } catch (err) {
+      console.warn('[x402] Facilitator unreachable, running in degraded mode:', err);
+      // Return empty supported response — x402 routes will return 402 on every request
+      return { kinds: [], extensions: [], signers: {} };
+    }
+  };
 
   const evmScheme = new ExactEvmScheme();
   evmScheme.registerMoneyParser(async (amount: number, network: string) => {
