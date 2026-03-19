@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { SignJWT } from 'jose'
 import { POST } from './route'
 
-const JWT_SECRET = 'dev-secret-do-not-use-in-production'
+// Must match the JWT_SECRET injected by vitest.config.mts env block
+const JWT_SECRET = 'test-secret-that-is-at-least-32-characters-long'
 const SECRET_KEY = new TextEncoder().encode(JWT_SECRET)
 
 async function makeToken(sub = '0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF') {

@@ -91,6 +91,7 @@ contract VerseNFT is ERC721Enumerable, Ownable, Pausable, ReentrancyGuard {
 
     /// @notice Returns the earliest timestamp at which `addr` can mint again
     function nextMintableTimestamp(address addr) external view returns (uint256) {
+        // slither-disable-next-line incorrect-equality
         if (mintCooldown == 0 || lastMintTimestamp[addr] == 0) return block.timestamp;
         uint256 nextTime = lastMintTimestamp[addr] + mintCooldown;
         return nextTime > block.timestamp ? nextTime : block.timestamp;

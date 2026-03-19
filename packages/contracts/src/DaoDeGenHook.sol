@@ -127,6 +127,7 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
     /// @notice Execute a previously scheduled pause state change after the timelock.
     function executePause() external {
         if (msg.sender != owner) revert NotOwner();
+        // slither-disable-next-line incorrect-equality
         if (pauseScheduledAt == 0) revert NoPauseScheduled();
         if (block.timestamp < pauseScheduledAt + TIMELOCK_DELAY) revert TimelockNotExpired();
 

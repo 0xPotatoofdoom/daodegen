@@ -108,6 +108,7 @@ contract DaoDeGenJar is Ownable, ReentrancyGuard, Pausable {
             // Only distribute funds not already allocated to holders
             uint256 distributable = balance > outstanding[asset] ? balance - outstanding[asset] : 0;
 
+            // slither-disable-next-line incorrect-equality
             if (distributable == 0) continue;
 
             uint256 perHolder = distributable / totalNFTs;
@@ -144,8 +145,11 @@ contract DaoDeGenJar is Ownable, ReentrancyGuard, Pausable {
             uint256 amount = claimable[tokenId][asset];
             
             if (amount > 0) {
+                // CEI: clear state before external call to prevent reentrancy
                 claimable[tokenId][asset] = 0;
                 outstanding[asset] -= amount;
+
+                emit Claimed(tokenId, holder, asset, amount);
 
                 if (asset.isAddressZero()) {
                     // slither-disable-next-line arbitrary-send-eth
@@ -154,8 +158,6 @@ contract DaoDeGenJar is Ownable, ReentrancyGuard, Pausable {
                 } else {
                     asset.transfer(holder, amount);
                 }
-
-                emit Claimed(tokenId, holder, asset, amount);
             }
         }
     }

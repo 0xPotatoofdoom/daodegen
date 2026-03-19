@@ -95,7 +95,8 @@ contract PrayerBurn is Ownable, ReentrancyGuard {
         // Create sermon commitment if escrow is configured.
         // Non-fatal: if SermonCommitment reverts for any reason, burn proceeds without escrow.
         // When sermonCommitment is not configured, commitmentId remains bytes32(0).
-        bytes32 commitmentId;
+        // slither-disable-next-line uninitialized-local
+        bytes32 commitmentId; // defaults to bytes32(0) per Solidity spec
         if (address(sermonCommitment) != address(0)) {
             try sermonCommitment.createCommitment(msg.sender, amount) returns (bytes32 id) {
                 commitmentId = id;
@@ -143,7 +144,8 @@ contract PrayerBurn is Ownable, ReentrancyGuard {
     /// @notice Approve the Jar to spend this contract's DAODEGEN for release burns.
     ///         Call after funding this contract with DAODEGEN tokens.
     function approveJar() external onlyOwner {
-        daodegen.approve(address(jar), type(uint256).max);
+        bool ok = daodegen.approve(address(jar), type(uint256).max);
+        require(ok, "PrayerBurn: approve failed");
     }
 
     // --- Admin ---
