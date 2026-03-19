@@ -268,6 +268,103 @@ contract DaoDeGenHookTest is Test {
     }
 
     // -------------------------------------------------------------------------
+    // Ownership transfer tests (Issue #291)
+    // -------------------------------------------------------------------------
+
+    function test_TransferOwnership_SetsPendingOwner() public {
+        address newOwner = makeAddr("newOwner");
+        hook.transferOwnership(newOwner);
+        assertEq(hook.pendingOwner(), newOwner);
+        assertEq(hook.owner(), address(this)); // not yet transferred
+    }
+
+    function test_TransferOwnership_EmitsEvent() public {
+        address newOwner = makeAddr("newOwner");
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.OwnershipTransferInitiated(address(this), newOwner);
+        hook.transferOwnership(newOwner);
+    }
+
+    function test_TransferOwnership_RevertsForNonOwner() public {
+        address nonOwner = makeAddr("nonOwner");
+        vm.prank(nonOwner);
+        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
+        hook.transferOwnership(makeAddr("newOwner"));
+    }
+
+    function test_TransferOwnership_RevertsForZeroAddress() public {
+        vm.expectRevert(DaoDeGenHook.InvalidAddress.selector);
+        hook.transferOwnership(address(0));
+    }
+
+    function test_AcceptOwnership_TransfersOwner() public {
+        address newOwner = makeAddr("newOwner");
+        hook.transferOwnership(newOwner);
+
+        vm.prank(newOwner);
+        hook.acceptOwnership();
+
+        assertEq(hook.owner(), newOwner);
+        assertEq(hook.pendingOwner(), address(0));
+    }
+
+    function test_AcceptOwnership_EmitsEvent() public {
+        address newOwner = makeAddr("newOwner");
+        hook.transferOwnership(newOwner);
+
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.OwnershipTransferred(address(this), newOwner);
+        vm.prank(newOwner);
+        hook.acceptOwnership();
+    }
+
+    function test_AcceptOwnership_RevertsForNonPendingOwner() public {
+        address newOwner = makeAddr("newOwner");
+        hook.transferOwnership(newOwner);
+
+        address rando = makeAddr("rando");
+        vm.prank(rando);
+        vm.expectRevert(DaoDeGenHook.NotPendingOwner.selector);
+        hook.acceptOwnership();
+    }
+
+    function test_RenounceOwnership_SetsOwnerToZero() public {
+        hook.renounceOwnership();
+        assertEq(hook.owner(), address(0));
+        assertEq(hook.pendingOwner(), address(0));
+    }
+
+    function test_RenounceOwnership_EmitsEvent() public {
+        vm.expectEmit(true, true, true, true);
+        emit DaoDeGenHook.OwnershipTransferred(address(this), address(0));
+        hook.renounceOwnership();
+    }
+
+    function test_RenounceOwnership_RevertsForNonOwner() public {
+        address nonOwner = makeAddr("nonOwner");
+        vm.prank(nonOwner);
+        vm.expectRevert(DaoDeGenHook.NotOwner.selector);
+        hook.renounceOwnership();
+    }
+
+    function test_RenounceOwnership_ClearsPendingOwner() public {
+        hook.transferOwnership(makeAddr("newOwner"));
+        hook.renounceOwnership();
+        assertEq(hook.pendingOwner(), address(0));
+    }
+
+    function test_NewOwner_CanUsePause() public {
+        address newOwner = makeAddr("newOwner");
+        hook.transferOwnership(newOwner);
+        vm.prank(newOwner);
+        hook.acceptOwnership();
+
+        vm.prank(newOwner);
+        hook.schedulePause(true);
+        assertTrue(hook.paused());
+    }
+
+    // -------------------------------------------------------------------------
     // Pure pass-through callbacks — selector correctness
     // -------------------------------------------------------------------------
 
