@@ -136,10 +136,17 @@ contract Deploy is Script {
             bytes32 salt = keccak256(abi.encodePacked("DaoDeGenHook", nonce));
             address predicted = computeCreate2Address(salt, initCodeHash);
 
-            if (uint160(predicted) & requiredFlags == requiredFlags) {
-                console.log("Found hook address:", predicted, "with nonce:", nonce);
-                return predicted;
-            }
+            uint160 addrBits = uint160(predicted) & 0x3FFF;
+            // Must have required flags
+            if (addrBits & requiredFlags != requiredFlags) { nonce++; continue; }
+            // Must not have BEFORE_SWAP_RETURNS_DELTA (bit 3) without BEFORE_SWAP (bit 7)
+            if ((addrBits & (1 << 3)) != 0 && (addrBits & (1 << 7)) == 0) { nonce++; continue; }
+            // Must not have AFTER_ADD_LIQ_RETURNS_DELTA (bit 1) without AFTER_ADD_LIQ (bit 10)
+            if ((addrBits & (1 << 1)) != 0 && (addrBits & (1 << 10)) == 0) { nonce++; continue; }
+            // Must not have AFTER_REMOVE_LIQ_RETURNS_DELTA (bit 0) without AFTER_REMOVE_LIQ (bit 8)
+            if ((addrBits & (1 << 0)) != 0 && (addrBits & (1 << 8)) == 0) { nonce++; continue; }
+            console.log("Found hook address:", predicted, "with nonce:", nonce);
+            return predicted;
 
             nonce++;
             if (nonce > 1000000) {

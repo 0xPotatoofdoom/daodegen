@@ -39,10 +39,10 @@ contract SeedPool is Script {
     using StateLibrary for IPoolManager;
     using CurrencyLibrary for Currency;
 
-    // ── Unichain Sepolia addresses ──────────────────────────────────────────
+    // ── Unichain Sepolia addresses (v4 deploy 2026-03-19, hook re-mined for valid flags) ──
     IPoolManager constant POOL_MANAGER = IPoolManager(0x00B036B58a818B1BC34d502D3fE730Db729e62AC);
-    address       constant DAODEGEN    = 0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16;
-    address       constant HOOK        = 0x86be03d383bB06b8f33Ac79E87BAfd64C9684044;
+    address       constant DAODEGEN    = 0x40e2809DDFD640A710308E492F8CFF0d8A81544A;
+    address       constant HOOK        = 0x44A04fe733BB985883430b6627e84B5f658Ec044;
 
     // ── Pool parameters ─────────────────────────────────────────────────────
     uint24  constant FEE          = 0;   // pure-hook fee model

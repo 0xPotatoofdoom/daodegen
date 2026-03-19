@@ -28,9 +28,9 @@ contract DeployHookOnly is Script {
         address jar;
 
         if (chainId == 1301) {
-            // Unichain Sepolia
+            // Unichain Sepolia (v4 deploy 2026-03-19)
             poolManager = 0x00B036B58a818B1BC34d502D3fE730Db729e62AC;
-            jar = 0xd25a5C67F180811e43990B2A0148Ac0d93ab9336;
+            jar = 0x5b9adbf87E37661bdA99B0a054485b01e44f3A0d;
         } else if (chainId == 130) {
             // Unichain Mainnet
             poolManager = 0x1F98400000000000000000000000000000000004;

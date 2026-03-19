@@ -34,8 +34,8 @@ export const CHAIN_CONFIG: Record<number, ChainAddresses> = {
     rpc:             'https://sepolia.unichain.org',
     universalRouter: '0xf70536b3bcc1bd1a972dc186a2cf84cc6da6be5d',
     stateView:       '0xc199f1072a74d4e905aba1a84d9a45e2546b6222',
-    daodegenToken:   '0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16',
-    daodegenHook:    '0x86be03d383bB06b8f33Ac79E87BAfd64C9684044',
+    daodegenToken:   '0x40e2809DDFD640A710308E492F8CFF0d8A81544A',  // v4 deploy 2026-03-19
+    daodegenHook:    '0x44A04fe733BB985883430b6627e84B5f658Ec044',  // v4 hook re-mined 2026-03-19
   },
   130: {
     chainId:         130,
