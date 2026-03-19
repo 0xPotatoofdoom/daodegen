@@ -37,8 +37,24 @@ function parseEnv(): Env {
 
   if (result.success) {
     if (process.env.NODE_ENV === 'production') {
-      if (result.data.JWT_SECRET === 'dev-secret-do-not-use-in-production') {
-        console.error('[env] JWT_SECRET must not use the dev default in production');
+      const KNOWN_WEAK_SECRETS = new Set([
+        'dev-secret-do-not-use-in-production',
+        'build-placeholder',
+        'change-me-in-production',
+        'REPLACE_WITH_STRONG_SECRET_MIN_32_CHARS',
+      ]);
+      if (KNOWN_WEAK_SECRETS.has(result.data.JWT_SECRET)) {
+        console.error(
+          'FATAL: JWT_SECRET is set to a known placeholder value. ' +
+            'Generate a strong random secret (>= 32 chars): openssl rand -base64 48',
+        );
+        process.exit(1);
+      }
+      if (result.data.JWT_SECRET.length < 32) {
+        console.error(
+          'FATAL: JWT_SECRET must be at least 32 characters. ' +
+            'Generate one with: openssl rand -base64 48',
+        );
         process.exit(1);
       }
       if (result.data.FACILITATOR_URL === 'http://localhost:4402') {

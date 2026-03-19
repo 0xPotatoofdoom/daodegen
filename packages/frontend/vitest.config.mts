@@ -10,7 +10,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    env: { JWT_SECRET: 'test-secret' },
+    env: { JWT_SECRET: 'test-secret-that-is-at-least-32-characters-long' },
     alias: {
       '@': path.resolve(__dirname, './src'),
     },

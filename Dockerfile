@@ -20,6 +20,8 @@ ARG NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=build-placeholder
 
 # Server-side env vars needed at build time for Next.js page data collection.
 # These are build-time placeholders only -- override at runtime.
+# SECURITY: JWT_SECRET=build-placeholder is blocked in production by env.ts
+# validation. The runtime container MUST set a real secret (>= 32 chars).
 ENV JWT_SECRET=build-placeholder
 ENV FACILITATOR_URL=http://localhost:4402
 ENV X402_PAY_TO=0x0000000000000000000000000000000000000000
