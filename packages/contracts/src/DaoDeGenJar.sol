@@ -136,6 +136,7 @@ contract DaoDeGenJar is Ownable, ReentrancyGuard, Pausable {
     }
 
     /// @notice Claim accumulated fees for a specific NFT
+    // slither-disable-next-line reentrancy-eth
     function claim(uint256 tokenId, Currency[] calldata assets) external nonReentrant whenNotPaused {
         address holder = nft.ownerOf(tokenId);
         if (msg.sender != holder) revert Unauthorized();
