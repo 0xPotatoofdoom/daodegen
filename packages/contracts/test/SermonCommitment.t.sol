@@ -200,6 +200,43 @@ contract SermonCommitmentTest is Test {
     // Edge cases
     // =========================================================================
 
+    function testCannotFulfillAfterDeadline() public {
+        vm.prank(prayerBurn);
+        bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
+
+        // Warp to exactly the deadline — fulfill should revert (>= check)
+        vm.warp(block.timestamp + 300);
+
+        vm.prank(pastor);
+        vm.expectRevert(SermonCommitment.FulfillmentWindowExpired.selector);
+        escrow.fulfill(id, keccak256("too late"));
+    }
+
+    function testCannotFulfillAfterDeadlinePastExpiry() public {
+        vm.prank(prayerBurn);
+        bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
+
+        vm.warp(block.timestamp + 301);
+
+        vm.prank(pastor);
+        vm.expectRevert(SermonCommitment.FulfillmentWindowExpired.selector);
+        escrow.fulfill(id, keccak256("way too late"));
+    }
+
+    function testFulfillOneSecondBeforeDeadline() public {
+        vm.prank(prayerBurn);
+        bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);
+
+        // Warp to one second before deadline — should succeed
+        vm.warp(block.timestamp + 299);
+
+        vm.prank(pastor);
+        escrow.fulfill(id, keccak256("just in time"));
+
+        (, , , , bool fulfilled,) = escrow.commitments(id);
+        assertTrue(fulfilled);
+    }
+
     function testCannotRefundFulfilledCommitment() public {
         vm.prank(prayerBurn);
         bytes32 id = escrow.createCommitment(supplicant, BURN_AMOUNT);

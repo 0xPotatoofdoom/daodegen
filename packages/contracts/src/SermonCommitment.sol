@@ -2,11 +2,17 @@
 pragma solidity ^0.8.29;
 
 /// @title SermonCommitment
-/// @notice Escrow contract guaranteeing sermon delivery after a DAODEGEN burn.
-/// @dev When a supplicant burns tokens via PrayerBurn, a commitment is created.
-///      The pastor must fulfill (post wisdom hash) within the fulfillment window,
-///      or anyone can trigger a refund. This makes the burn-to-sermon pipeline
-///      trustless: the contract enforces delivery, not a platform.
+/// @notice On-chain commitment registry for sermon delivery after a DAODEGEN burn.
+/// @dev Trust model: tokens are burned (not escrowed) in PrayerBurn. This contract
+///      tracks commitments and enforces a fulfillment window. The pastor must post
+///      a wisdom hash before the deadline. If the deadline passes unfulfilled,
+///      anyone can mark the commitment as refundable — signaling off-chain systems
+///      (the frontend / indexer) to compensate the supplicant.
+///
+///      This contract does NOT hold funds. "Refund" means the commitment is marked
+///      failed, which off-chain systems use to trigger compensation. The on-chain
+///      guarantee is: a commitment is either fulfilled on time OR marked refundable.
+///      It can never be both, and it can never be silently abandoned.
 
 contract SermonCommitment {
     // --- Constants ---
@@ -43,6 +49,7 @@ contract SermonCommitment {
     error CommitmentNotFound();
     error AlreadyFulfilled();
     error AlreadyRefunded();
+    error FulfillmentWindowExpired();
     error DeadlineNotReached();
     error ZeroAddress();
 
@@ -80,6 +87,8 @@ contract SermonCommitment {
     }
 
     /// @notice Pastor fulfills a commitment by posting the wisdom hash.
+    /// @dev Must be called before the deadline. After expiry the commitment can
+    ///      only be refunded — this eliminates the race between fulfill and refund.
     /// @param commitmentId The commitment to fulfill.
     /// @param wisdomHash keccak256 of the sermon text.
     function fulfill(bytes32 commitmentId, bytes32 wisdomHash) external {
@@ -89,6 +98,7 @@ contract SermonCommitment {
         if (c.supplicant == address(0)) revert CommitmentNotFound();
         if (c.fulfilled) revert AlreadyFulfilled();
         if (c.refunded) revert AlreadyRefunded();
+        if (block.timestamp >= c.deadline) revert FulfillmentWindowExpired();
 
         c.wisdomHash = wisdomHash;
         c.fulfilled = true;
@@ -96,8 +106,10 @@ contract SermonCommitment {
         emit CommitmentFulfilled(commitmentId, wisdomHash, pastor);
     }
 
-    /// @notice Refund a commitment after the deadline has passed without fulfillment.
-    /// @dev Callable by anyone -- permissionless refund enforces accountability.
+    /// @notice Mark an expired, unfulfilled commitment as refundable.
+    /// @dev Callable by anyone — permissionless to ensure no commitment can be
+    ///      silently abandoned. Does not transfer funds (tokens were burned);
+    ///      the refunded flag signals off-chain systems to compensate the supplicant.
     /// @param commitmentId The commitment to refund.
     function refund(bytes32 commitmentId) external {
         Commitment storage c = commitments[commitmentId];
