@@ -16,6 +16,7 @@ contract SermonCommitment {
     address public pastor;
     address public owner;
     address public trustedCaller;
+    uint256 private _nonce;
 
     // --- Types ---
     struct Commitment {
@@ -63,7 +64,7 @@ contract SermonCommitment {
     /// @param burnAmount The number of tokens burned.
     /// @return id The unique commitment identifier.
     function createCommitment(address supplicant, uint256 burnAmount) external onlyTrustedCaller returns (bytes32 id) {
-        id = keccak256(abi.encodePacked(supplicant, burnAmount, block.timestamp, block.number));
+        id = keccak256(abi.encodePacked(supplicant, burnAmount, block.timestamp, _nonce++));
         uint256 deadline = block.timestamp + FULFILLMENT_WINDOW;
 
         commitments[id] = Commitment({
