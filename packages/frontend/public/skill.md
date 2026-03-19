@@ -7,7 +7,7 @@
 Dao DeGen is an on-chain ritual protocol on Unichain. Agents and humans burn DAODEGEN tokens, receive AI-generated wisdom from 81 sacred verses (Tao Te Ching adapted for DeFi), and can mint verses as NFTs. Swap fees are captured by a Uniswap V4 hook and distributed to NFT holders.
 
 **Site:** https://0xdead.church (prayer UI) / https://daodegen.com (API + agent endpoints)
-**Chain:** Unichain mainnet (chainId 130) — prayer/temple UI on Sepolia
+**Chain:** Unichain Sepolia (chainId 1301)
 **Source:** https://github.com/0xPotatoofdoom/daodegen
 **Inference:** When `VENICE_API_KEY` is set, sermons are powered by [Venice AI](https://venice.ai) — a privacy-preserving inference provider with no data retention. Prayers remain private.
 
@@ -50,15 +50,14 @@ Use the JWT in subsequent requests: `Authorization: Bearer <JWT>`
 
 ## Contract Addresses (Unichain Sepolia — 1301)
 
-| Contract | Address | Network |
-|----------|---------|---------|
-| DAODEGEN Token | `0x2719dcB70D7cA9DDbB018D7795Ee2F2A98f80947` | Unichain mainnet (130) |
-| VerseNFT | `0xA5290EEfEEd1dCBE8e8f12D9584Bc7bd14f948A1` | Unichain mainnet (130) |
-| DaoDeGenJar | `0x78D404fAaED5Ff2db7dC960A8F0798589bB6cd9b` | Unichain mainnet (130) |
-| DaoDeGenHook | `0x000FCDfd31d4a78b261A5256A1fD1EDbbc009937` | Unichain mainnet (130) |
-| AgentRegistry | `0x8105821036A5AD70B1291787C2Eabf455038eE20` | Unichain mainnet (130) |
-| PrayerBurn (temple) | `0xa93ca8C24AEbD7d2aE4f69D38f3aA5cB40B487Da` | Unichain Sepolia (1301) |
-| DAODEGEN Token (testnet) | `0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16` | Unichain Sepolia (1301) |
+| Contract | Address |
+|----------|---------|
+| DAODEGEN Token | `0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16` |
+| VerseNFT | `0x63d24FADFe2431462bc7cC362e8aE1E3f17fAf50` |
+| DaoDeGenJar | `0xd25a5C67F180811e43990B2A0148Ac0d93ab9336` |
+| DaoDeGenHook | `0x000FCDfd31d4a78b261A5256A1fD1EDbbc009937` |
+| AgentRegistry | `0xBFE569F809b644703175Be603684Be0b7f6eee89` |
+| PrayerBurn | `0x22A0EDaBF0a567C8eE646472607c25c9021920D6` |
 
 ## API Endpoints
 
@@ -142,10 +141,10 @@ curl -X POST https://daodegen.com/api/swap \
     "endpoint": "/quote",
     "params": {
       "type": "EXACT_INPUT",
-      "tokenInChainId": 130,
-      "tokenOutChainId": 130,
+      "tokenInChainId": 1301,
+      "tokenOutChainId": 1301,
       "tokenIn": "0x0000000000000000000000000000000000000000",
-      "tokenOut": "0x2719dcB70D7cA9DDbB018D7795Ee2F2A98f80947",
+      "tokenOut": "0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16",
       "amount": "1000000000000000",
       "swapper": "<YOUR_ADDRESS>",
       "slippageTolerance": 0.5
@@ -232,8 +231,7 @@ See [SELF_PROTOCOL.md](https://github.com/0xPotatoofdoom/daodegen/blob/main/docs
 
 ## Links
 
-- **Explorer (mainnet):** https://uniscan.xyz
-- **Explorer (testnet):** https://sepolia.uniscan.xyz
+- **Explorer:** https://unichain-sepolia.blockscout.com
 - **Faucet:** https://faucet.unichain.org
 - **GitHub:** https://github.com/0xPotatoofdoom/daodegen
 - **Issues:** https://github.com/0xPotatoofdoom/daodegen/issues
