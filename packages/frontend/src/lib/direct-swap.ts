@@ -40,10 +40,10 @@ export const CHAIN_CONFIG: Record<number, ChainAddresses> = {
   130: {
     chainId:         130,
     rpc:             'https://mainnet.unichain.org',
-    universalRouter: '0xEf740bf23acae26f6492b10de645d6b98dc8eaf3', // TODO: confirm post-deploy
+    universalRouter: '0xEf740bf23acae26f6492b10de645d6b98dc8eaf3',
     stateView:       '0x86e8631a016f9068c3f085faf484ee3f5fdee8f2',
-    daodegenToken:   '0x0000000000000000000000000000000000000000' as `0x${string}`, // TODO: set post-mainnet-deploy
-    daodegenHook:    '0x0000000000000000000000000000000000000000' as `0x${string}`, // TODO: set post-mainnet-deploy
+    daodegenToken:   '0x2719dcB70D7cA9DDbB018D7795Ee2F2A98f80947',
+    daodegenHook:    '0x000FCDfd31d4a78b261A5256A1fD1EDbbc009937',
   },
 }
 
