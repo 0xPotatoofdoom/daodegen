@@ -487,6 +487,42 @@ contract VerseNFTTest is Test {
         verseNFT.mint{value: price}();
         assertEq(verseNFT.nextMintableTimestamp(user1), block.timestamp);
     }
+
+    // ---- Reentrancy Guard Test ----
+
+    function testMintReentrancyReverts() public {
+        verseNFT.setMintCooldown(0);
+
+        ReentrantMinter attacker = new ReentrantMinter(verseNFT);
+        vm.deal(address(attacker), 100 ether);
+
+        vm.expectRevert();
+        attacker.attack();
+    }
+}
+
+/// @dev Malicious contract that attempts reentrancy via onERC721Received
+contract ReentrantMinter {
+    VerseNFT private target;
+
+    constructor(VerseNFT _target) {
+        target = _target;
+    }
+
+    function attack() external {
+        uint256 price = target.mintPrice();
+        target.mint{value: price}();
+    }
+
+    function onERC721Received(address, address, uint256, bytes calldata) external returns (bytes4) {
+        uint256 price = target.mintPrice();
+        if (address(this).balance >= price) {
+            target.mint{value: price}();
+        }
+        return this.onERC721Received.selector;
+    }
+
+    receive() external payable {}
 }
 
 /// @dev Helper to force-send ETH to a contract via selfdestruct
