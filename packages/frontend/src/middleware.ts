@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { MemoryRateLimitStore } from './lib/stores/memory';
+import { RedisRateLimitStore } from './lib/stores/redis';
 
 // ---------------------------------------------------------------------------
-// Rate limiter -- sliding window per IP, no external dependencies.
-// Evicts stale entries every 60s to bound memory on a cheap VPS.
-// NOTE: Middleware runs in Edge Runtime — must use memory store only
-// (ioredis/Node.js APIs are not available in Edge).
+// Rate limiter -- sliding window per IP, backed by Redis so limits survive
+// restarts and are shared across processes.
+// Evicts stale entries every 60s to bound the local cache.
 // ---------------------------------------------------------------------------
 
-const buckets = new MemoryRateLimitStore();
+export const runtime = 'nodejs'; // ioredis requires Node.js APIs
+
+const buckets = new RedisRateLimitStore();
 
 // Cleanup stale buckets every 60s
 let lastCleanup = Date.now();
