@@ -28,10 +28,18 @@ contract EventsAndErrorsTest is Test {
 
     // --- DaoDeGenJar ---
 
-    function test_Jar_EmitsEventOnSetBurnAmount() public {
+    function test_Jar_EmitsEventOnScheduleBurnAmount() public {
+        vm.expectEmit(true, false, false, true);
+        emit DaoDeGenJar.BurnAmountScheduled(200, block.timestamp + 2 days);
+        jar.scheduleBurnAmount(200);
+    }
+
+    function test_Jar_EmitsEventOnExecuteBurnAmount() public {
+        jar.scheduleBurnAmount(200);
+        vm.warp(block.timestamp + 2 days);
         vm.expectEmit(true, false, false, true);
         emit BurnAmountUpdated(200);
-        jar.setBurnAmount(200);
+        jar.executeBurnAmount();
     }
 
     // --- VerseNFT ---

@@ -32,12 +32,25 @@ contract DaoDeGenJar is Ownable, ReentrancyGuard, Pausable {
     ///      See GasBenchmark.t.sol for measured values.
     uint256 public constant MAX_ASSETS = 10;
 
+    /// @notice Timelock delay for burn-amount changes.
+    uint256 public constant TIMELOCK_DELAY = 2 days;
+
+    /// @notice Timestamp when a burn-amount change was scheduled (0 = none pending).
+    uint256 public burnAmountScheduledAt;
+
+    /// @notice The burn amount that was scheduled.
+    uint256 public scheduledBurnAmount;
+
     error NothingToRelease();
     error Unauthorized();
     error TransferFailed();
     error DuplicateAsset();
     error TooManyAssets();
+    error NoBurnAmountScheduled();
+    error TimelockNotExpired();
 
+    event BurnAmountScheduled(uint256 newAmount, uint256 executeAfter);
+    event BurnAmountChangeCancelled(uint256 cancelledAmount);
     event FeesReleased(address indexed caller, uint256 burnAmount, uint256 nftHolders);
     event BurnAmountUpdated(uint256 newAmount);
     event Claimed(uint256 indexed tokenId, address indexed holder, Currency indexed asset, uint256 amount);
@@ -147,12 +160,32 @@ contract DaoDeGenJar is Ownable, ReentrancyGuard, Pausable {
         }
     }
 
-    /// @notice Update the burn amount required for release
-    /// @dev No timelock -- owner accepts frontrunning risk since burn amount
-    ///      changes are infrequent governance decisions, not price-sensitive.
-    function setBurnAmount(uint256 _burnAmount) external onlyOwner {
-        burnAmount = _burnAmount;
-        emit BurnAmountUpdated(_burnAmount);
+    /// @notice Schedule a burn-amount change. Requires a 2-day timelock.
+    /// @param _burnAmount The desired new burn amount.
+    function scheduleBurnAmount(uint256 _burnAmount) external onlyOwner {
+        burnAmountScheduledAt = block.timestamp;
+        scheduledBurnAmount = _burnAmount;
+        emit BurnAmountScheduled(_burnAmount, block.timestamp + TIMELOCK_DELAY);
+    }
+
+    /// @notice Execute a previously scheduled burn-amount change after the timelock.
+    function executeBurnAmount() external onlyOwner {
+        if (burnAmountScheduledAt == 0) revert NoBurnAmountScheduled();
+        if (block.timestamp < burnAmountScheduledAt + TIMELOCK_DELAY) revert TimelockNotExpired();
+
+        burnAmount = scheduledBurnAmount;
+        burnAmountScheduledAt = 0;
+        emit BurnAmountUpdated(scheduledBurnAmount);
+    }
+
+    /// @notice Cancel a pending burn-amount change.
+    function cancelBurnAmount() external onlyOwner {
+        if (burnAmountScheduledAt == 0) revert NoBurnAmountScheduled();
+
+        uint256 cancelled = scheduledBurnAmount;
+        burnAmountScheduledAt = 0;
+        scheduledBurnAmount = 0;
+        emit BurnAmountChangeCancelled(cancelled);
     }
 
     function pause() external onlyOwner { _pause(); }
