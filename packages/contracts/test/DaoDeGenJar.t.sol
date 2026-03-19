@@ -444,8 +444,10 @@ contract DaoDeGenJarTest is Test {
         (bool success,) = address(jar).call{value: 1 ether}("");
         require(success);
 
-        // Set burn amount to 0
-        jar.setBurnAmount(0);
+        // Schedule burn amount to 0 via timelock
+        jar.scheduleBurnAmount(0);
+        vm.warp(block.timestamp + 2 days);
+        jar.executeBurnAmount();
 
         Currency[] memory assets = new Currency[](1);
         assets[0] = CurrencyLibrary.ADDRESS_ZERO;
@@ -457,6 +459,77 @@ contract DaoDeGenJarTest is Test {
         assertEq(jar.claimable(1, assets[0]), 1 ether);
         // No tokens burned
         assertEq(token.balanceOf(user1), 1000e18);
+    }
+
+    // ── Burn-amount timelock tests ─────────────────────────────
+
+    function testScheduleBurnAmountEmitsEvent() public {
+        vm.expectEmit(false, false, false, true);
+        emit DaoDeGenJar.BurnAmountScheduled(200e18, block.timestamp + 2 days);
+        jar.scheduleBurnAmount(200e18);
+
+        assertEq(jar.scheduledBurnAmount(), 200e18);
+        assertEq(jar.burnAmountScheduledAt(), block.timestamp);
+    }
+
+    function testExecuteBurnAmountAfterTimelock() public {
+        jar.scheduleBurnAmount(200e18);
+        vm.warp(block.timestamp + 2 days);
+        jar.executeBurnAmount();
+
+        assertEq(jar.burnAmount(), 200e18);
+        assertEq(jar.burnAmountScheduledAt(), 0);
+    }
+
+    function testExecuteBurnAmountRevertsBeforeTimelock() public {
+        jar.scheduleBurnAmount(200e18);
+        vm.warp(block.timestamp + 2 days - 1);
+
+        vm.expectRevert(DaoDeGenJar.TimelockNotExpired.selector);
+        jar.executeBurnAmount();
+    }
+
+    function testExecuteBurnAmountRevertsWhenNoneScheduled() public {
+        vm.expectRevert(DaoDeGenJar.NoBurnAmountScheduled.selector);
+        jar.executeBurnAmount();
+    }
+
+    function testCancelBurnAmount() public {
+        jar.scheduleBurnAmount(200e18);
+        jar.cancelBurnAmount();
+
+        assertEq(jar.burnAmountScheduledAt(), 0);
+        assertEq(jar.scheduledBurnAmount(), 0);
+        // Original burn amount unchanged
+        assertEq(jar.burnAmount(), BURN_AMOUNT);
+    }
+
+    function testCancelBurnAmountRevertsWhenNoneScheduled() public {
+        vm.expectRevert(DaoDeGenJar.NoBurnAmountScheduled.selector);
+        jar.cancelBurnAmount();
+    }
+
+    function testScheduleBurnAmountOnlyOwner() public {
+        vm.prank(user1);
+        vm.expectRevert();
+        jar.scheduleBurnAmount(200e18);
+    }
+
+    function testExecuteBurnAmountOnlyOwner() public {
+        jar.scheduleBurnAmount(200e18);
+        vm.warp(block.timestamp + 2 days);
+
+        vm.prank(user1);
+        vm.expectRevert();
+        jar.executeBurnAmount();
+    }
+
+    function testCancelBurnAmountOnlyOwner() public {
+        jar.scheduleBurnAmount(200e18);
+
+        vm.prank(user1);
+        vm.expectRevert();
+        jar.cancelBurnAmount();
     }
 
     function testDustDistribution() public {

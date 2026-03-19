@@ -342,7 +342,9 @@ contract PrayerBurnTest is Test {
         require(ok);
 
         // Set jar burn amount to 0 so PrayerBurn doesn't need tokens for release
-        jar.setBurnAmount(0);
+        jar.scheduleBurnAmount(0);
+        vm.warp(block.timestamp + 2 days);
+        jar.executeBurnAmount();
 
         // Enable auto-release with 1 ether threshold
         prayer.setReleaseThreshold(1 ether);
@@ -412,7 +414,9 @@ contract PrayerBurnTest is Test {
 
     function testAutoReleaseSkippedBelowThreshold() public {
         nft.ownerMint(user1, 1);
-        jar.setBurnAmount(0);
+        jar.scheduleBurnAmount(0);
+        vm.warp(block.timestamp + 2 days);
+        jar.executeBurnAmount();
 
         // Fund jar with only 0.5 ether (below 1 ether threshold)
         (bool ok,) = address(jar).call{value: 0.5 ether}("");
