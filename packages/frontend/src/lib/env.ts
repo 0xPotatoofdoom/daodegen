@@ -57,7 +57,12 @@ function parseEnv(): Env {
         );
         process.exit(1);
       }
-      if (result.data.FACILITATOR_URL === 'http://localhost:4402') {
+      // Reject localhost facilitator in production unless E2E_BASE_URL is set
+      // (E2E_BASE_URL signals a CI/e2e environment, not a real production deploy)
+      if (
+        result.data.FACILITATOR_URL === 'http://localhost:4402' &&
+        !process.env.E2E_BASE_URL
+      ) {
         console.error('[env] FACILITATOR_URL must be set explicitly in production');
         process.exit(1);
       }
