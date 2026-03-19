@@ -42,3 +42,4 @@ ipfs-hashes.json
 agent_log.json
 scripts/mvp-prayer-results/
 scripts/daodegen_vps_setup.sh
+scripts/validate-setup.js
