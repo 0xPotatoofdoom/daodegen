@@ -69,6 +69,16 @@ jobs:
     needs: [frontend]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     env:
       NODE_OPTIONS: '--max-old-space-size=6144'
       NEXT_PUBLIC_VERSE_NFT_ADDRESS: '0x63d24FADFe2431462bc7cC362e8aE1E3f17fAf50'
@@ -81,6 +91,7 @@ jobs:
       X402_PAY_TO: '0x3D0e10329c864A7422761af058f909267a776029'
       NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID: 'e2e-test-project-id'
       E2E_BASE_URL: 'http://localhost:3066'
+      REDIS_URL: 'redis://127.0.0.1:6379'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
