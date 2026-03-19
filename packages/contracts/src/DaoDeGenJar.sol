@@ -135,6 +135,7 @@ contract DaoDeGenJar is Ownable, ReentrancyGuard, Pausable {
                 outstanding[asset] -= amount;
 
                 if (asset.isAddressZero()) {
+                    // slither-disable-next-line arbitrary-send-eth
                     (bool success,) = holder.call{value: amount}("");
                     if (!success) revert TransferFailed();
                 } else {

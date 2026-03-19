@@ -179,6 +179,7 @@ contract DaoDeGenHook is IHooks, IUnlockCallback {
 
         // Forward to jar immediately
         if (feeCurrency.isAddressZero()) {
+            // slither-disable-next-line arbitrary-send-eth
             (bool ok,) = jar.call{value: feeAmount}("");
             require(ok, "ETH to jar failed");
         } else {

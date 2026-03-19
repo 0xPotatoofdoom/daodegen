@@ -55,5 +55,9 @@
     "solidity"
   ],
   "author": "0xPotatoofdoom",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "@hono/node-server": ">=1.19.10",
+    "kysely": ">=0.28.11"
+  }
 }
