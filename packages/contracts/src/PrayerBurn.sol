@@ -13,8 +13,9 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 ///      (b) this contract holds DAODEGEN and has approved the Jar (call approveJar()).
 
 interface IDaoDeGenJar {
+    // Currency is `type Currency is address` in v4-core — same ABI encoding as address.
+    // We declare it as address here to avoid importing the user-defined type.
     function release(address[] calldata assets) external;
-    function outstanding(address asset) external view returns (uint256);
     function burnAmount() external view returns (uint256);
 }
 
@@ -111,17 +112,19 @@ contract PrayerBurn is Ownable, ReentrancyGuard {
 
     /// @dev Best-effort trigger of Jar fee distribution. Silently returns if
     ///      any condition isn't met (threshold, jar balance, burn funding).
+    ///
+    /// NOTE: We intentionally do NOT call jar.outstanding() here.
+    ///       outstanding() takes a Currency (user-defined v4-core type) and reverts
+    ///       when called from an interface that declares it as plain address, causing
+    ///       the try/catch to silently abort. Instead we compare raw ETH balance to
+    ///       releaseThreshold directly — slightly optimistic (may include unclaimed
+    ///       ETH), but safe: release() is idempotent and distributes whatever is
+    ///       available at call time.
     function _tryRelease() internal {
         if (releaseThreshold == 0) return;
 
-        // Check distributable ETH in jar
-        uint256 jarBalance = address(jar).balance;
-        try jar.outstanding(address(0)) returns (uint256 allocated) {
-            if (jarBalance <= allocated) return;
-            if (jarBalance - allocated < releaseThreshold) return;
-        } catch {
-            return;
-        }
+        // Check raw ETH balance in jar against threshold
+        if (address(jar).balance < releaseThreshold) return;
 
         // Check if this contract can cover jar's burn cost
         try jar.burnAmount() returns (uint256 cost) {
@@ -130,7 +133,7 @@ contract PrayerBurn is Ownable, ReentrancyGuard {
             return;
         }
 
-        // Attempt release
+        // Attempt release — non-fatal if it fails
         address[] memory assets = new address[](1);
         assets[0] = address(0);
         try jar.release(assets) {} catch {}
