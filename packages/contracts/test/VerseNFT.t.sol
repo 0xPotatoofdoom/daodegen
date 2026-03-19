@@ -176,6 +176,57 @@ contract VerseNFTTest is Test {
         uint256 finalBalance = address(this).balance;
 
         assertEq(finalBalance - initialBalance, price);
+        assertEq(verseNFT.mintRevenue(), 0);
+    }
+
+    function testWithdrawOnlyMintRevenue() public {
+        // Mint to accumulate revenue
+        vm.deal(user1, 1 ether);
+        uint256 price = verseNFT.mintPrice();
+        vm.prank(user1);
+        verseNFT.mint{value: price}();
+
+        // Force-send extra ETH via selfdestruct (simulates stray ETH)
+        ForceEther forcer = new ForceEther();
+        vm.deal(address(forcer), 5 ether);
+        forcer.destroy(address(verseNFT));
+
+        // Contract now holds price + 5 ether, but mintRevenue is only price
+        assertEq(address(verseNFT).balance, price + 5 ether);
+        assertEq(verseNFT.mintRevenue(), price);
+
+        uint256 initialBalance = address(this).balance;
+        verseNFT.withdraw();
+        uint256 finalBalance = address(this).balance;
+
+        // Owner only receives mint revenue, not the force-sent ETH
+        assertEq(finalBalance - initialBalance, price);
+        // Stray ETH remains in contract
+        assertEq(address(verseNFT).balance, 5 ether);
+    }
+
+    function testWithdrawRevertsWhenNoRevenue() public {
+        vm.expectRevert(VerseNFT.NothingToWithdraw.selector);
+        verseNFT.withdraw();
+    }
+
+    function testMintRevenueTracksMultipleMints() public {
+        verseNFT.setMintCooldown(0);
+        vm.deal(user1, 100 ether);
+
+        uint256 price1 = verseNFT.mintPrice();
+        vm.prank(user1);
+        verseNFT.mint{value: price1}();
+
+        uint256 price2 = verseNFT.mintPrice();
+        vm.prank(user1);
+        verseNFT.mint{value: price2}();
+
+        assertEq(verseNFT.mintRevenue(), price1 + price2);
+
+        uint256 initialBalance = address(this).balance;
+        verseNFT.withdraw();
+        assertEq(address(this).balance - initialBalance, price1 + price2);
     }
 
     function testTokenURI() public {
@@ -400,4 +451,12 @@ contract VerseNFTTest is Test {
         verseNFT.mint{value: price}();
         assertEq(verseNFT.nextMintableTimestamp(user1), block.timestamp);
     }
+}
+
+/// @dev Helper to force-send ETH to a contract via selfdestruct
+contract ForceEther {
+    function destroy(address target) external {
+        selfdestruct(payable(target));
+    }
+    receive() external payable {}
 }
