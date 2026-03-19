@@ -36,3 +36,6 @@ packages/facilitator/dist/
 # Internal docs moved to Notion
 docs/
 soul.md
+scripts/ipfs/
+scripts/ipfs-migration.js
+ipfs-hashes.json
