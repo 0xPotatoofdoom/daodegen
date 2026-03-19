@@ -42,6 +42,7 @@ function parseEnv(): Env {
         'build-placeholder',
         'change-me-in-production',
         'REPLACE_WITH_STRONG_SECRET_MIN_32_CHARS',
+        'e2e-test-secret-for-ci-pipeline-do-not-use',
       ]);
       if (KNOWN_WEAK_SECRETS.has(result.data.JWT_SECRET)) {
         console.error(
