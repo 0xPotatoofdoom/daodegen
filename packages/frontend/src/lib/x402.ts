@@ -63,9 +63,25 @@ export function getX402Server() {
 
 // Keep the named export for backwards compatibility in routes that
 // import x402Server directly -- but access it lazily.
+// In CI/e2e environments where the facilitator isn't running, method calls
+// will throw at request time (not at module load/static-generation time),
+// so the Next.js build worker doesn't crash.
 export const x402Server = new Proxy({} as ReturnType<typeof x402ResourceServer.prototype.register>, {
   get(_target, prop, receiver) {
-    const server = getX402Server();
+    let server: ReturnType<typeof x402ResourceServer.prototype.register>;
+    try {
+      server = getX402Server();
+    } catch (err) {
+      // Return a stub function that throws at call time rather than at proxy-get time.
+      // This prevents unhandledRejection during Next.js static page data collection
+      // when the facilitator is not available (e.g. CI/e2e builds).
+      if (typeof prop === 'string') {
+        return (..._args: unknown[]) => {
+          throw new Error(`[x402] Server unavailable (facilitator not running): ${String(err)}`);
+        };
+      }
+      return undefined;
+    }
     const value = Reflect.get(server, prop, receiver);
     return typeof value === 'function' ? value.bind(server) : value;
   },
