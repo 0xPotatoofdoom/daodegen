@@ -5,12 +5,13 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 /// @title VerseNFT
 /// @notice 81 NFTs — one per verse of the Dao DeGen
-contract VerseNFT is ERC721Enumerable, Ownable, Pausable {
+contract VerseNFT is ERC721Enumerable, Ownable, Pausable, ReentrancyGuard {
     using Strings for uint256;
 
     uint256 public constant MAX_SUPPLY = 81;
@@ -53,7 +54,7 @@ contract VerseNFT is ERC721Enumerable, Ownable, Pausable {
     }
 
     /// @notice Mint the next available verse NFT
-    function mint() external payable whenNotPaused {
+    function mint() external payable whenNotPaused nonReentrant {
         if (mintCooldown > 0 && lastMintTimestamp[msg.sender] > 0 && block.timestamp < lastMintTimestamp[msg.sender] + mintCooldown) {
             revert MintCooldownActive();
         }
