@@ -1,9 +1,21 @@
 export const NATIVE_ETH_ADDRESS = '0x0000000000000000000000000000000000000000'
 
+let _authToken: string | null = null
+
+/** Set the JWT auth token used for swap API calls. */
+export function setSwapAuthToken(token: string | null) {
+  _authToken = token
+}
+
 async function apiCall<T>(endpoint: string, params: object): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (_authToken) {
+    headers['Authorization'] = `Bearer ${_authToken}`
+  }
+
   const res = await fetch('/api/swap', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ endpoint, params }),
   })
 

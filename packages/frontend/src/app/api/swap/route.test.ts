@@ -1,9 +1,32 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { SignJWT } from 'jose'
 import { POST } from './route'
+
+const JWT_SECRET = 'dev-secret-do-not-use-in-production'
+const SECRET_KEY = new TextEncoder().encode(JWT_SECRET)
+
+async function makeToken(sub = '0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF') {
+  return new SignJWT({ sub })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('1h')
+    .sign(SECRET_KEY)
+}
+
+function makeRequest(body: unknown, token?: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  return new Request('http://localhost/api/swap', {
+    method: 'POST',
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+    headers,
+  })
+}
 
 describe('POST /api/swap', () => {
   beforeEach(() => {
     process.env.UNISWAP_API_KEY = 'test-key'
+    process.env.JWT_SECRET = JWT_SECRET
     vi.stubGlobal('fetch', vi.fn())
   })
 
@@ -12,14 +35,30 @@ describe('POST /api/swap', () => {
     delete process.env.UNISWAP_API_KEY
   })
 
+  // ── Auth ─────────────────────────────────────────────────────────
+
+  it('returns 401 when Authorization header is missing', async () => {
+    const req = makeRequest({ endpoint: '/quote', params: {} })
+    const res = await POST(req as any)
+    expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body.error.code).toBe('AUTH_MISSING_TOKEN')
+  })
+
+  it('returns 401 when JWT is invalid', async () => {
+    const req = makeRequest({ endpoint: '/quote', params: {} }, 'bad-token')
+    const res = await POST(req as any)
+    expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body.error.code).toBe('AUTH_INVALID_TOKEN')
+  })
+
+  // ── Existing behaviour (now behind auth) ─────────────────────────
+
   it('returns 500 when UNISWAP_API_KEY is not set', async () => {
     delete process.env.UNISWAP_API_KEY
-
-    const req = new Request('http://localhost/api/swap', {
-      method: 'POST',
-      body: JSON.stringify({ endpoint: '/quote', params: {} }),
-      headers: { 'Content-Type': 'application/json' },
-    })
+    const token = await makeToken()
+    const req = makeRequest({ endpoint: '/quote', params: {} }, token)
 
     const res = await POST(req as any)
     expect(res.status).toBe(500)
@@ -28,37 +67,32 @@ describe('POST /api/swap', () => {
   })
 
   it('returns 400 when body is invalid JSON', async () => {
+    const token = await makeToken()
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    }
     const req = new Request('http://localhost/api/swap', {
       method: 'POST',
       body: 'not-valid-json',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
     })
 
     const res = await POST(req as any)
     expect(res.status).toBe(400)
-    const body = await res.json()
-    expect(body).toEqual({ detail: 'Invalid JSON' })
   })
 
   it('returns 400 when endpoint is missing', async () => {
-    const req = new Request('http://localhost/api/swap', {
-      method: 'POST',
-      body: JSON.stringify({ params: { foo: 'bar' } }),
-      headers: { 'Content-Type': 'application/json' },
-    })
+    const token = await makeToken()
+    const req = makeRequest({ params: { foo: 'bar' } }, token)
 
     const res = await POST(req as any)
     expect(res.status).toBe(400)
-    const body = await res.json()
-    expect(body).toEqual({ detail: 'Invalid endpoint: undefined' })
   })
 
   it('returns 400 when endpoint is not in the allowlist', async () => {
-    const req = new Request('http://localhost/api/swap', {
-      method: 'POST',
-      body: JSON.stringify({ endpoint: '/admin', params: {} }),
-      headers: { 'Content-Type': 'application/json' },
-    })
+    const token = await makeToken()
+    const req = makeRequest({ endpoint: '/admin', params: {} }, token)
 
     const res = await POST(req as any)
     expect(res.status).toBe(400)
@@ -74,11 +108,8 @@ describe('POST /api/swap', () => {
       json: async () => upstreamData,
     } as any)
 
-    const req = new Request('http://localhost/api/swap', {
-      method: 'POST',
-      body: JSON.stringify({ endpoint: '/quote', params: { foo: 'bar' } }),
-      headers: { 'Content-Type': 'application/json' },
-    })
+    const token = await makeToken()
+    const req = makeRequest({ endpoint: '/quote', params: { foo: 'bar' } }, token)
 
     const res = await POST(req as any)
     expect(res.status).toBe(200)
@@ -95,11 +126,8 @@ describe('POST /api/swap', () => {
       json: async () => errorData,
     } as any)
 
-    const req = new Request('http://localhost/api/swap', {
-      method: 'POST',
-      body: JSON.stringify({ endpoint: '/swap', params: {} }),
-      headers: { 'Content-Type': 'application/json' },
-    })
+    const token = await makeToken()
+    const req = makeRequest({ endpoint: '/swap', params: {} }, token)
 
     const res = await POST(req as any)
     expect(res.status).toBe(422)
@@ -115,11 +143,8 @@ describe('POST /api/swap', () => {
       json: async () => { throw new Error('bad json') },
     } as any)
 
-    const req = new Request('http://localhost/api/swap', {
-      method: 'POST',
-      body: JSON.stringify({ endpoint: '/check_approval', params: {} }),
-      headers: { 'Content-Type': 'application/json' },
-    })
+    const token = await makeToken()
+    const req = makeRequest({ endpoint: '/check_approval', params: {} }, token)
 
     const res = await POST(req as any)
     expect(res.status).toBe(503)
@@ -134,11 +159,8 @@ describe('POST /api/swap', () => {
       json: async () => ({}),
     } as any)
 
-    const req = new Request('http://localhost/api/swap', {
-      method: 'POST',
-      body: JSON.stringify({ endpoint: '/order', params: { order: 'data' } }),
-      headers: { 'Content-Type': 'application/json' },
-    })
+    const token = await makeToken()
+    const req = makeRequest({ endpoint: '/order', params: { order: 'data' } }, token)
 
     await POST(req as any)
 

@@ -74,6 +74,8 @@ const RATE_RULES: RateRule[] = [
   { prefix: '/v1/sermon',     maxRequests: 5 * multiplier,  windowMs: 60_000 },
   // Congregation state -- public, but no reason to poll faster than this
   { prefix: '/v1/congregation/', maxRequests: 30 * multiplier, windowMs: 60_000 },
+  // Swap proxy -- JWT-gated + per-wallet limit in route, but cap IP too
+  { prefix: '/api/swap',    maxRequests: 30 * multiplier, windowMs: 60_000 },
   // Ops status -- monitoring dashboard
   { prefix: '/api/ops/', maxRequests: 30 * multiplier, windowMs: 60_000 },
 ];
