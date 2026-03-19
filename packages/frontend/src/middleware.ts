@@ -1,51 +1,37 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { MemoryRateLimitStore } from './lib/stores/memory';
+import { getRedis } from './lib/stores/redis';
 
 // ---------------------------------------------------------------------------
-// Rate limiter -- sliding window per IP, no external dependencies.
-// Evicts stale entries every 60s to bound memory on a cheap VPS.
-// NOTE: Middleware runs in Edge Runtime — must use memory store only
-// (ioredis/Node.js APIs are not available in Edge).
+// Rate limiter — Redis-backed INCR + EXPIRE (survives restarts, works
+// across multiple Next.js processes).  Follows the same pattern as the
+// facilitator.  Falls open (allows request) if Redis is unreachable.
+// Key format: ratelimit:middleware:<ip>:<route-prefix>
 // ---------------------------------------------------------------------------
 
-const buckets = new MemoryRateLimitStore();
-
-// Cleanup stale buckets every 60s
-let lastCleanup = Date.now();
-const CLEANUP_INTERVAL = 60_000;
-
-function cleanup(now: number) {
-  if (now - lastCleanup < CLEANUP_INTERVAL) return;
-  lastCleanup = now;
-  for (const [key, bucket] of buckets.entries()) {
-    if (bucket.timestamps.length === 0) {
-      buckets.delete(key);
+/**
+ * Returns true if the request should be blocked (rate-limited).
+ * Uses atomic INCR + EXPIRE in Redis — no in-memory state.
+ */
+async function isRateLimited(
+  ip: string,
+  routePrefix: string,
+  maxRequests: number,
+  windowSeconds: number,
+): Promise<boolean> {
+  try {
+    const redis = getRedis();
+    const key = `ratelimit:middleware:${ip}:${routePrefix}`;
+    const count = await redis.incr(key);
+    if (count === 1) {
+      await redis.expire(key, windowSeconds);
     }
-  }
-}
-
-// Returns true if the request is allowed, false if rate-limited.
-function rateLimit(ip: string, path: string, maxRequests: number, windowMs: number): boolean {
-  const now = Date.now();
-  cleanup(now);
-
-  const key = `${ip}:${path}`;
-  let bucket = buckets.get(key);
-  if (!bucket) {
-    bucket = { timestamps: [] };
-    buckets.set(key, bucket);
-  }
-
-  const cutoff = now - windowMs;
-  bucket.timestamps = bucket.timestamps.filter((t: number) => t > cutoff);
-
-  if (bucket.timestamps.length >= maxRequests) {
+    return count > maxRequests;
+  } catch (err) {
+    // Fail open — if Redis is down, allow the request rather than blocking users
+    console.error('[middleware] Redis rate-limit check failed:', err instanceof Error ? err.message : err);
     return false;
   }
-
-  bucket.timestamps.push(now);
-  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +41,7 @@ function rateLimit(ip: string, path: string, maxRequests: number, windowMs: numb
 interface RateRule {
   prefix: string;
   maxRequests: number;
-  windowMs: number;
+  windowSeconds: number;
 }
 
 // In E2E test environments, relax rate limits to avoid flaky tests.
@@ -64,18 +50,18 @@ const multiplier = (process.env.E2E_BASE_URL && process.env.NODE_ENV !== 'produc
 
 const RATE_RULES: RateRule[] = [
   // Auth endpoints -- tight limits, no reason to hammer these
-  { prefix: '/api/auth/',     maxRequests: 5 * multiplier,  windowMs: 60_000 },
+  { prefix: '/api/auth/',     maxRequests: 5 * multiplier,  windowSeconds: 60 },
   // Health check -- monitoring tools poll this
-  { prefix: '/api/health',    maxRequests: 30 * multiplier, windowMs: 60_000 },
+  { prefix: '/api/health',    maxRequests: 30 * multiplier, windowSeconds: 60 },
   // Verse API -- already gated by JWT + x402 payment, but cap anyway
-  { prefix: '/v1/verse/',     maxRequests: 10 * multiplier, windowMs: 60_000 },
+  { prefix: '/v1/verse/',     maxRequests: 10 * multiplier, windowSeconds: 60 },
   // Sermon -- JWT gated + per-wallet cooldown in route, but cap IP too
-  { prefix: '/v1/sermon/anonymous', maxRequests: 3 * multiplier, windowMs: 60_000 },
-  { prefix: '/v1/sermon',     maxRequests: 5 * multiplier,  windowMs: 60_000 },
+  { prefix: '/v1/sermon/anonymous', maxRequests: 3 * multiplier, windowSeconds: 60 },
+  { prefix: '/v1/sermon',     maxRequests: 5 * multiplier,  windowSeconds: 60 },
   // Congregation state -- public, but no reason to poll faster than this
-  { prefix: '/v1/congregation/', maxRequests: 30 * multiplier, windowMs: 60_000 },
+  { prefix: '/v1/congregation/', maxRequests: 30 * multiplier, windowSeconds: 60 },
   // Ops status -- monitoring dashboard
-  { prefix: '/api/ops/', maxRequests: 30 * multiplier, windowMs: 60_000 },
+  { prefix: '/api/ops/', maxRequests: 30 * multiplier, windowSeconds: 60 },
 ];
 
 function getRateRule(pathname: string): RateRule | null {
@@ -89,7 +75,7 @@ function getRateRule(pathname: string): RateRule | null {
 // Middleware
 // ---------------------------------------------------------------------------
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── Trace ID ──────────────────────────────────────────────────
@@ -97,17 +83,17 @@ export function middleware(request: NextRequest) {
   // Propagated downstream via x-request-id header.
   const traceId = request.headers.get('x-request-id') || crypto.randomUUID();
 
-  // Rate limiting for API routes
+  // Rate limiting for API routes (Redis-backed, survives restarts)
   const rule = getRateRule(pathname);
   if (rule) {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
       || request.headers.get('x-real-ip')
       || '127.0.0.1';
 
-    if (!rateLimit(ip, rule.prefix, rule.maxRequests, rule.windowMs)) {
+    if (await isRateLimited(ip, rule.prefix, rule.maxRequests, rule.windowSeconds)) {
       return NextResponse.json(
-        { error: { code: 'RATE_LIMITED', message: 'Too many requests', details: { retryAfter: 60 } } },
-        { status: 429, headers: { 'Retry-After': '60', 'x-request-id': traceId } },
+        { error: { code: 'RATE_LIMITED', message: 'Too many requests', details: { retryAfter: rule.windowSeconds } } },
+        { status: 429, headers: { 'Retry-After': String(rule.windowSeconds), 'x-request-id': traceId } },
       );
     }
   }
@@ -158,6 +144,9 @@ export function middleware(request: NextRequest) {
 
   return response;
 }
+
+// Use Node.js runtime so we can access ioredis (not available in Edge Runtime).
+export const runtime = 'nodejs';
 
 export const config = {
   matcher: [
