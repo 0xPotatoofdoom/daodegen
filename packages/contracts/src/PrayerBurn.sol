@@ -142,7 +142,7 @@ contract PrayerBurn is Ownable, ReentrancyGuard {
 
     /// @notice Approve the Jar to spend this contract's DAODEGEN for release burns.
     ///         Call after funding this contract with DAODEGEN tokens.
-    function approveJar() external {
+    function approveJar() external onlyOwner {
         daodegen.approve(address(jar), type(uint256).max);
     }
 

@@ -450,10 +450,14 @@ contract PrayerBurnTest is Test {
         vm.stopPrank();
     }
 
-    function testApproveJarAnyone() public {
-        // Anyone can call approveJar -- it just approves the jar to spend
-        // PrayerBurn's tokens, which is harmless
+    function testApproveJar() public {
+        prayer.approveJar();
+        assertEq(token.allowance(address(prayer), address(jar)), type(uint256).max);
+    }
+
+    function testApproveJarOnlyOwner() public {
         vm.prank(user1);
+        vm.expectRevert();
         prayer.approveJar();
     }
 }
