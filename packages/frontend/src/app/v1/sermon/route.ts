@@ -151,8 +151,15 @@ export async function POST(req: NextRequest) {
   await markBurnTxUsed(prayerTx);
   recordPrayer(senderAddress, sermon.sentiment_tag as SentimentTag);
 
-  // ---Get Prayer ID from Ponder indexer---
-  const prayer = await fetchPrayerByTxHash(prayerTx, senderAddress);
+  // ---Get Prayer ID from Ponder indexer (retry up to 3x — indexer may lag a few seconds)---
+  let prayer = await fetchPrayerByTxHash(prayerTx, senderAddress);
+  if (!prayer) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await new Promise(r => setTimeout(r, 2000));
+      prayer = await fetchPrayerByTxHash(prayerTx, senderAddress);
+      if (prayer) break;
+    }
+  }
 
   // --- Fulfill sermon commitment on-chain (if commitment_id provided) ---
   let fulfillTx: string | undefined;
