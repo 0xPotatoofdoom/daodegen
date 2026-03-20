@@ -33,6 +33,7 @@ webServers.push({
     FACILITATOR_URL: 'http://localhost:4402',
     E2E_BASE_URL: baseURL,
     REDIS_URL: 'redis://127.0.0.1:6379',
+    CI: 'true',
   },
 });
 

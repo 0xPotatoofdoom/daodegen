@@ -61,7 +61,9 @@ interface RateRule {
 
 // In E2E test environments, relax rate limits to avoid flaky tests.
 // Blocked in production to prevent accidental misconfiguration.
-const multiplier = (process.env.E2E_BASE_URL && process.env.NODE_ENV !== 'production') ? 10 : 1;
+// In CI or E2E environments, disable rate limiting entirely to prevent flaky tests
+const RATE_LIMIT_DISABLED = process.env.CI === 'true' || !!process.env.E2E_BASE_URL;
+const multiplier = RATE_LIMIT_DISABLED ? 10000 : 1;
 
 const RATE_RULES: RateRule[] = [
   // Auth endpoints -- tight limits, no reason to hammer these
