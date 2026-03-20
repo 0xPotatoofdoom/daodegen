@@ -36,7 +36,10 @@ function parseEnv(): Env {
   });
 
   if (result.success) {
-    if (process.env.NODE_ENV === 'production') {
+    // Skip production guards during Next.js build phase — secrets are placeholders at build time
+    // and will be validated at runtime when the server starts.
+    const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+    if (process.env.NODE_ENV === 'production' && !isBuildPhase) {
       const KNOWN_WEAK_SECRETS = new Set([
         'dev-secret-do-not-use-in-production',
         'build-placeholder',
