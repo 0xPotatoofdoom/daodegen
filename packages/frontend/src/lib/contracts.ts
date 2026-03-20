@@ -4,12 +4,13 @@ export { chainConfig } from './chain-config'
 // Contract addresses — chain is driven by NEXT_PUBLIC_ACTIVE_CHAIN (see chain-config.ts).
 // NEXT_PUBLIC_* vars are inlined at build time by Next.js — must be literal references.
 // Dev fallbacks point to the Sepolia testnet deployment.
+// Unichain mainnet addresses (fallbacks — overridden by NEXT_PUBLIC_* env vars at build time)
 export const CONTRACT_ADDRESSES = {
-  VERSE_NFT: process.env.NEXT_PUBLIC_VERSE_NFT_ADDRESS || '0x63d24FADFe2431462bc7cC362e8aE1E3f17fAf50',
-  DAODEGEN_TOKEN: process.env.NEXT_PUBLIC_DAODEGEN_TOKEN_ADDRESS || '0x9BbF24fDE364b328943ee2A21E818d6446Ff5a16',
-  DAODEGEN_JAR: process.env.NEXT_PUBLIC_DAODEGEN_JAR_ADDRESS || '0xd25a5C67F180811e43990B2A0148Ac0d93ab9336',
-  AGENT_REGISTRY: process.env.NEXT_PUBLIC_AGENT_REGISTRY_ADDRESS || '0xBFE569F809b644703175Be603684Be0b7f6eee89',
-  PRAYER_BURN: process.env.NEXT_PUBLIC_PRAYER_BURN_ADDRESS || '0x22A0EDaBF0a567C8eE646472607c25c9021920D6',
+  VERSE_NFT: process.env.NEXT_PUBLIC_VERSE_NFT_ADDRESS || '0x39032854eD3512A7cB4f62158bC9004db6dDe5dC',
+  DAODEGEN_TOKEN: process.env.NEXT_PUBLIC_DAODEGEN_TOKEN_ADDRESS || '0x40e2809DDFD640A710308E492F8CFF0d8A81544A',
+  DAODEGEN_JAR: process.env.NEXT_PUBLIC_DAODEGEN_JAR_ADDRESS || '0x5b9adbf87E37661bdA99B0a054485b01e44f3A0d',
+  AGENT_REGISTRY: process.env.NEXT_PUBLIC_AGENT_REGISTRY_ADDRESS || '0x2865833642974073B07BC205cf7FF4282BAa5d08',
+  PRAYER_BURN: process.env.NEXT_PUBLIC_PRAYER_BURN_ADDRESS || '0x2aFB7e968D034BBbe0c53E27C4359192D72544ae',
 } as const
 
 // ABIs - Essential functions only (parsed for wagmi/viem compatibility)
