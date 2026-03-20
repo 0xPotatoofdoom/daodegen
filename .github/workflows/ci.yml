@@ -147,7 +147,7 @@ jobs:
           retention-days: 14
 
   e2e-mainnet:
-    name: Visual QA (mainnet — 0xdead.church)
+    name: Visual QA (mainnet — daodegen.com)
     # Run on schedule (nightly) or manually via workflow_dispatch.
     # Does NOT run on every PR to avoid hammering the live site.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -168,7 +168,7 @@ jobs:
         working-directory: packages/frontend
         env:
           CI: true
-          BASE_URL: 'https://0xdead.church'
+          BASE_URL: 'https://daodegen.com'
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
