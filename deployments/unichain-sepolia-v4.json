@@ -21,5 +21,7 @@
     "DaoDeGenJar_burnAmount": "1000 DAODEGEN",
     "initialHolder": "0x3D0e10329c864A7422761af058f909267a776029"
   },
-  "previousDeployment": "unichain-sepolia-v3.json"
+  "previousDeployment": "unichain-sepolia-v3.json",
+  "e2eVerified": "2026-03-19",
+  "e2eResults": "7/7 PrayerBurn tests pass. Full cascade verified: pray() → _tryRelease() → jar.release() → FeesReleased(burn=1000 DAODEGEN, holders=2). ETH distributed proportionally to NFT holders. Ready for mainnet."
 }
