@@ -120,16 +120,11 @@ jobs:
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
         working-directory: packages/frontend
-      - name: Start frontend (background)
-        run: npm run start -w packages/frontend &
-      - name: Wait for frontend
-        run: |
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:3066/ && exit 0
-            sleep 1
-          done
-          echo "Frontend failed to start" && exit 1
       - name: Run E2E tests (auth, x402, security headers)
+        # Note: frontend server is started by playwright.config.ts webServer config
+        # with the correct E2E_BASE_URL env (needed for rate limit multiplier).
+        # Do NOT start it manually here — reuseExistingServer would pick up a
+        # server without E2E_BASE_URL, keeping the rate multiplier at 1.
         run: npx playwright test
         working-directory: packages/frontend
         env:
