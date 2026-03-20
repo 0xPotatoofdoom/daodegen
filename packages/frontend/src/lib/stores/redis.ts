@@ -33,6 +33,11 @@ export function getRedis(): Redis {
       lazyConnect: true,
       keyPrefix: "daodegen:",
     });
+    // Prevent unhandled error events from crashing the process
+    // (ioredis emits 'error' which kills Node if unlistened)
+    _redis.on('error', (err) => {
+      console.error("[redis] Connection error:", err.message);
+    });
     _redis.connect().catch((err) => {
       console.error("[redis] Connection failed:", err.message);
     });
