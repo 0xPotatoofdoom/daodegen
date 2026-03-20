@@ -42,5 +42,8 @@ export async function authenticate(request: APIRequestContext): Promise<string> 
   });
 
   const body = await verifyRes.json();
+  if (!body.token) {
+    console.error('[auth fixture] verify failed:', verifyRes.status(), JSON.stringify(body));
+  }
   return body.token;
 }
