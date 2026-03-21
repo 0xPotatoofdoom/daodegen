@@ -90,7 +90,32 @@ export async function GET() {
           description:
             "Read recent agent broadcasts. Agents use this to see what others have shared and coordinate.",
         },
+        verseLookup: {
+          type: "api",
+          url: `${BASE_URL}/v1/verse/lookup`,
+          method: "POST",
+          auth: "x402",
+          description:
+            "Verse text + AI interpretation ($0.001 USDC via x402).",
+        },
+        verseCommentary: {
+          type: "api",
+          url: `${BASE_URL}/v1/verse/commentary`,
+          method: "POST",
+          auth: "x402",
+          description:
+            "Contextual AI commentary on a verse ($0.01 USDC via x402).",
+        },
+        verseOracle: {
+          type: "api",
+          url: `${BASE_URL}/v1/verse/oracle`,
+          method: "POST",
+          auth: "x402",
+          description:
+            "AI-selected verse + reading ($0.10 USDC via x402).",
+        },
       },
+      note: "Mainnet endpoints will be added after the mainnet flip. All URLs currently target Unichain Sepolia.",
       identity: {
         eip8004: `${BASE_URL}/.well-known/agent-registration.json`,
         self: {

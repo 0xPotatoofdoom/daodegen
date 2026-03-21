@@ -33,3 +33,21 @@ export interface CongregationStore {
   all(): Iterable<PrayerRecord>;
   clear(): void;
 }
+
+export interface BroadcastEntry {
+  id: string;
+  message: string;
+  verseNumber: number;
+  agentAddress: string;
+  timestamp: string;
+  isAgent: boolean;
+}
+
+export interface BroadcastStore {
+  push(entry: BroadcastEntry): void;
+  slice(start: number, end?: number): BroadcastEntry[];
+  length(): number;
+  all(): BroadcastEntry[];
+  clear(): void;
+  splice(start: number, deleteCount: number): void;
+}

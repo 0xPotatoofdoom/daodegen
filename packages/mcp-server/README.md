@@ -63,3 +63,5 @@ npm run dev      # watch mode
 npm test
 npm run build    # compile to dist/
 ```
+
+> **Note:** `dist/` is gitignored. Run `npm run build` before publishing to regenerate it.

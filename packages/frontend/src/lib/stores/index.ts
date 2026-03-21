@@ -1,5 +1,5 @@
-export type { NonceStore, RateLimitStore, CongregationStore, RateBucket, PrayerRecord } from './types';
-import { MemoryNonceStore, MemoryRateLimitStore, MemoryCongregationStore } from './memory';
+export type { NonceStore, RateLimitStore, CongregationStore, RateBucket, PrayerRecord, BroadcastStore, BroadcastEntry } from './types';
+import { MemoryNonceStore, MemoryRateLimitStore, MemoryCongregationStore, MemoryBroadcastStore } from './memory';
 
 /**
  * Store factory — returns Redis-backed stores when REDIS_URL is set,
@@ -31,4 +31,12 @@ export function createCongregationStore() {
     return new RedisCongregationStore();
   }
   return new MemoryCongregationStore();
+}
+
+export function createBroadcastStore() {
+  if (useRedis()) {
+    const { RedisBroadcastStore } = require('./redis');
+    return new RedisBroadcastStore();
+  }
+  return new MemoryBroadcastStore();
 }

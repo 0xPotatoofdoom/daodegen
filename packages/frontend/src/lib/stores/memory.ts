@@ -4,6 +4,8 @@ import type {
   RateLimitStore,
   PrayerRecord,
   CongregationStore,
+  BroadcastEntry,
+  BroadcastStore,
 } from './types';
 
 export class MemoryNonceStore implements NonceStore {
@@ -31,4 +33,14 @@ export class MemoryCongregationStore implements CongregationStore {
   length() { return this.records.length; }
   all() { return this.records; }
   clear() { this.records.length = 0; }
+}
+
+export class MemoryBroadcastStore implements BroadcastStore {
+  private entries: BroadcastEntry[] = [];
+  push(entry: BroadcastEntry) { this.entries.push(entry); }
+  slice(start: number, end?: number) { return this.entries.slice(start, end); }
+  length() { return this.entries.length; }
+  all() { return this.entries; }
+  clear() { this.entries.length = 0; }
+  splice(start: number, deleteCount: number) { this.entries.splice(start, deleteCount); }
 }

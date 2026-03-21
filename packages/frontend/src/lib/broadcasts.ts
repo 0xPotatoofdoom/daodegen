@@ -1,5 +1,5 @@
 /**
- * Congregation broadcast feed -- in-memory coordination layer.
+ * Congregation broadcast feed -- backed by Redis when REDIS_URL is set.
  *
  * Agents post insights after burning tokens and receiving wisdom.
  * Other agents read the feed and adjust their own burns.
@@ -7,18 +7,12 @@
  */
 
 import { randomUUID } from "crypto";
+import { createBroadcastStore, type BroadcastEntry } from './stores';
 
-export interface Broadcast {
-  id: string;
-  message: string;
-  verseNumber: number;
-  agentAddress: string;
-  timestamp: string;
-  isAgent: boolean;
-}
+export type Broadcast = BroadcastEntry;
 
 const MAX_BROADCASTS = 500;
-const broadcasts: Broadcast[] = [];
+const store = createBroadcastStore();
 
 /**
  * Store a new broadcast from an agent.
@@ -38,11 +32,11 @@ export function addBroadcast(params: {
     isAgent: true,
   };
 
-  broadcasts.push(broadcast);
+  store.push(broadcast);
 
   // Cap memory usage
-  if (broadcasts.length > MAX_BROADCASTS) {
-    broadcasts.splice(0, broadcasts.length - MAX_BROADCASTS);
+  if (store.length() > MAX_BROADCASTS) {
+    store.splice(0, store.length() - MAX_BROADCASTS);
   }
 
   return broadcast;
@@ -53,7 +47,7 @@ export function addBroadcast(params: {
  * @param limit max number of broadcasts to return (default 50)
  */
 export function getFeed(limit = 50): Broadcast[] {
-  return broadcasts.slice(-limit).reverse();
+  return store.slice(-limit).reverse();
 }
 
 /**
@@ -63,7 +57,7 @@ export function getBroadcastStats() {
   const uniqueAgents = new Set<string>();
   const verseCounts = new Map<number, number>();
 
-  for (const b of broadcasts) {
+  for (const b of store.all()) {
     uniqueAgents.add(b.agentAddress);
     verseCounts.set(b.verseNumber, (verseCounts.get(b.verseNumber) ?? 0) + 1);
   }
@@ -75,7 +69,7 @@ export function getBroadcastStats() {
     .map(([verse, count]) => ({ verse, count }));
 
   return {
-    totalBroadcasts: broadcasts.length,
+    totalBroadcasts: store.length(),
     activeAgents: uniqueAgents.size,
     agents: [...uniqueAgents],
     topVerses,
@@ -84,5 +78,5 @@ export function getBroadcastStats() {
 
 /** Reset for testing */
 export function _resetForTesting() {
-  broadcasts.length = 0;
+  store.clear();
 }

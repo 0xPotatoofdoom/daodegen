@@ -20,6 +20,8 @@ import type {
   RateLimitStore,
   PrayerRecord,
   CongregationStore,
+  BroadcastEntry,
+  BroadcastStore,
 } from "./types";
 
 // Singleton Redis client
@@ -207,5 +209,74 @@ export class RedisCongregationStore implements CongregationStore {
   clear(): void {
     this.records.length = 0;
     this.redis.del(CONGREGATION_KEY).catch(() => {});
+  }
+}
+
+// ─── BroadcastStore ───────────────────────────────────────────────
+
+const BROADCAST_KEY = "broadcasts";
+const MAX_BROADCAST_SIZE = 500;
+
+export class RedisBroadcastStore implements BroadcastStore {
+  private entries: BroadcastEntry[] = [];
+  private redis: Redis;
+  private loaded = false;
+
+  constructor(redis?: Redis) {
+    this.redis = redis || getRedis();
+    this._preload();
+  }
+
+  private async _preload() {
+    try {
+      const raw = await this.redis.lrange(BROADCAST_KEY, 0, MAX_BROADCAST_SIZE - 1);
+      this.entries = raw.map((r) => JSON.parse(r) as BroadcastEntry);
+      this.loaded = true;
+    } catch {
+      this.loaded = true;
+    }
+  }
+
+  push(entry: BroadcastEntry): void {
+    this.entries.push(entry);
+    if (this.entries.length > MAX_BROADCAST_SIZE) {
+      this.entries.splice(0, this.entries.length - MAX_BROADCAST_SIZE);
+    }
+    this.redis
+      .rpush(BROADCAST_KEY, JSON.stringify(entry))
+      .then(() => this.redis.ltrim(BROADCAST_KEY, -MAX_BROADCAST_SIZE, -1))
+      .catch((err) => {
+        console.error("[redis] BroadcastStore.push failed:", err instanceof Error ? err.message : err);
+      });
+  }
+
+  slice(start: number, end?: number): BroadcastEntry[] {
+    return this.entries.slice(start, end);
+  }
+
+  length(): number {
+    return this.entries.length;
+  }
+
+  all(): BroadcastEntry[] {
+    return this.entries;
+  }
+
+  clear(): void {
+    this.entries.length = 0;
+    this.redis.del(BROADCAST_KEY).catch(() => {});
+  }
+
+  splice(start: number, deleteCount: number): void {
+    this.entries.splice(start, deleteCount);
+    // Re-sync full list to Redis after splice
+    const pipeline = this.redis.pipeline();
+    pipeline.del(BROADCAST_KEY);
+    for (const entry of this.entries) {
+      pipeline.rpush(BROADCAST_KEY, JSON.stringify(entry));
+    }
+    pipeline.exec().catch((err) => {
+      console.error("[redis] BroadcastStore.splice failed:", err instanceof Error ? err.message : err);
+    });
   }
 }
